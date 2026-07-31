@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% block title %}Corpus — Bannerwise Quality Agent{% endblock %}
+
+{% block content %}
+<div class="page-corpus">
+    <div class="page-header">
+        <h2 class="page-title">Certified Q&A Corpus</h2>
+        <div class="search-bar">
+            <input type="text" id="corpusSearch" class="search-input" placeholder="Search questions..." oninput="searchCorpus()">
+        </div>
+    </div>
+
+    <!-- Status Filter Pills -->
+    <div class="filter-pills">
+        <button class="pill active" data-status="all" onclick="filterCorpus('all')">All</button>
+        <button class="pill" data-status="certified" onclick="filterCorpus('certified')">Certified</button>
+        <button class="pill" data-status="draft" onclick="filterCorpus('draft')">Draft</button>
+        <button class="pill" data-status="expired" onclick="filterCorpus('expired')">Expired</button>
+    </div>
+
+    <!-- Stats -->
+    <div id="corpusStats" class="stats-bar"></div>
+
+    <!-- Corpus Table -->
+    <div class="table-wrapper">
+        <table class="data-table" id="corpusTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Question</th>
+                    <th>Status</th>
+                    <th>Certified By</th>
+                    <th>Next Review</th>
+                </tr>
+            </thead>
+            <tbody id="corpusTableBody">
+                <!-- Populated via JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Detail Panel (shown on row click) -->
+    <div id="corpusDetail" class="detail-panel hidden"></div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => loadCorpus());
+</script>
+{% endblock %}

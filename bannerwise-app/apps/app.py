@@ -1,11 +1,12 @@
 """Bannerwise Quality Agent — Flask application entry point.
 
 Factory pattern creates and configures the app with modular blueprints.
+All data access is API-driven through service modules (currently mocked).
 """
 
 import os
 import logging
-from flask import Flask, redirect, url_for, session, render_template
+from flask import Flask, redirect, url_for, render_template
 
 from config import get_config
 
@@ -28,15 +29,21 @@ def create_app():
     # --- Register Blueprints ---
     from routes.health_routes import health_bp
     from routes.quality_routes import quality_bp
+    from routes.history_routes import history_bp
+    from routes.corpus_routes import corpus_bp
+    from routes.admin_routes import admin_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(quality_bp)
+    app.register_blueprint(history_bp)
+    app.register_blueprint(corpus_bp)
+    app.register_blueprint(admin_bp)
 
     # --- Root Route ---
     @app.route('/')
     def index():
-        """Landing page."""
-        return render_template('layout.html')
+        """Redirect to Ask page (primary interaction surface)."""
+        return redirect(url_for('quality.ask_page'))
 
     # --- Error Handlers ---
     @app.errorhandler(401)
@@ -46,6 +53,10 @@ def create_app():
     @app.errorhandler(403)
     def forbidden(e):
         return {'error': 'Access denied. Insufficient permissions.'}, 403
+
+    @app.errorhandler(404)
+    def not_found(e):
+        return {'error': 'Not found'}, 404
 
     @app.errorhandler(500)
     def internal_error(e):
@@ -61,4 +72,4 @@ app = create_app()
 
 if __name__ == '__main__':
     port = int(os.environ.get('DATABRICKS_APP_PORT', 8000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=True)

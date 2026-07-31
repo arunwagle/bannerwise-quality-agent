@@ -1,26 +1,30 @@
-"""Banner quality assessment routes."""
+"""Quality assessment routes — Ask page and API endpoint."""
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, render_template, request, jsonify
+from services.mock_router_service import assess_prompt
 
-quality_bp = Blueprint('quality', __name__, url_prefix='/api/quality')
+quality_bp = Blueprint('quality', __name__)
 
 
-@quality_bp.route('/assess', methods=['POST'])
-def assess_banner():
-    """Assess the quality of a banner."""
-    # TODO: Implement banner quality assessment logic
+@quality_bp.route('/ask')
+def ask_page():
+    """Render the Ask page."""
+    return render_template('ask.html')
+
+
+@quality_bp.route('/api/quality/assess', methods=['POST'])
+def api_assess():
+    """API: Assess a user prompt through the confidence gate.
+
+    Request JSON: {"prompt": "..."}
+    Response JSON: RouterResult (answer, badge, confidence, lane, provenance)
+
+    TODO: Replace mock_router_service.assess_prompt() with real
+          Model Serving endpoint call.
+    """
     data = request.get_json()
-    return jsonify({
-        'status': 'success',
-        'message': 'Quality assessment endpoint — implementation pending',
-        'input': data
-    }), 200
+    if not data or not data.get('prompt'):
+        return jsonify({'error': 'Missing required field: prompt'}), 400
 
-
-@quality_bp.route('/status', methods=['GET'])
-def quality_status():
-    """Get quality agent status."""
-    return jsonify({
-        'status': 'ready',
-        'agent': 'bannerwise-quality-agent'
-    }), 200
+    result = assess_prompt(data['prompt'])
+    return jsonify(result), 200

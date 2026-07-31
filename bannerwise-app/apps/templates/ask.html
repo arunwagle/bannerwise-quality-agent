@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+{% block title %}Ask — Bannerwise Quality Agent{% endblock %}
+
+{% block content %}
+<div class="page-ask">
+    <!-- Prompt Input Section -->
+    <div class="prompt-section">
+        <h2 class="page-title">Ask a Question</h2>
+        <div class="prompt-input-wrapper">
+            <textarea
+                id="promptInput"
+                class="prompt-input"
+                placeholder="Ask a question about your data..."
+                rows="3"
+            ></textarea>
+            <button id="submitBtn" class="btn btn-primary" onclick="submitPrompt()">
+                Submit
+            </button>
+        </div>
+        <div class="example-chips">
+            <span class="chip" onclick="useExample(this)">What is the total ad spend for Q1 2025?</span>
+            <span class="chip" onclick="useExample(this)">Show me campaign performance trends</span>
+            <span class="chip" onclick="useExample(this)">What is the click-through rate by banner size?</span>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="loading-indicator hidden">
+        <div class="spinner"></div>
+        <span>Assessing through confidence gate...</span>
+    </div>
+
+    <!-- Response Section (dynamically rendered) -->
+    <div id="responseSection" class="response-section hidden"></div>
+</div>
+{% endblock %}

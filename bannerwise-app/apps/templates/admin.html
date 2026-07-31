@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% block title %}Admin — Bannerwise Quality Agent{% endblock %}
+
+{% block content %}
+<div class="page-admin">
+    <h2 class="page-title">Administration</h2>
+
+    <div class="admin-grid">
+        <!-- System Status -->
+        <div class="admin-card">
+            <h3 class="card-title">System Status</h3>
+            <div id="systemStatus" class="status-list">
+                <!-- Populated via JS -->
+            </div>
+        </div>
+
+        <!-- Threshold Configuration -->
+        <div class="admin-card">
+            <h3 class="card-title">Confidence Threshold</h3>
+            <div class="threshold-control">
+                <input type="range" id="thresholdSlider" min="50" max="100" value="85"
+                       class="slider" oninput="updateThresholdDisplay()">
+                <span id="thresholdValue" class="threshold-value">0.85</span>
+            </div>
+            <button class="btn btn-secondary" onclick="saveThreshold()">Save Threshold</button>
+        </div>
+
+        <!-- Corpus Stats -->
+        <div class="admin-card">
+            <h3 class="card-title">Corpus Overview</h3>
+            <div id="adminCorpusStats" class="stat-grid">
+                <!-- Populated via JS -->
+            </div>
+        </div>
+
+        <!-- Endpoint Configuration -->
+        <div class="admin-card">
+            <h3 class="card-title">Endpoint Configuration</h3>
+            <div id="endpointConfig" class="config-list">
+                <!-- Populated via JS -->
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => loadAdminConfig());
+</script>
+{% endblock %}

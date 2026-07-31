@@ -1,0 +1,43 @@
+{% extends "layout.html" %}
+{% block title %}History — Bannerwise Quality Agent{% endblock %}
+
+{% block content %}
+<div class="page-history">
+    <div class="page-header">
+        <h2 class="page-title">Query History</h2>
+        <div class="filter-bar">
+            <button class="filter-btn active" data-filter="all" onclick="filterHistory('all')">All</button>
+            <button class="filter-btn" data-filter="certified" onclick="filterHistory('certified')">Certified</button>
+            <button class="filter-btn" data-filter="analytical" onclick="filterHistory('analytical')">Analytical</button>
+        </div>
+    </div>
+
+    <!-- Stats Bar -->
+    <div id="historyStats" class="stats-bar"></div>
+
+    <!-- History Table -->
+    <div class="table-wrapper">
+        <table class="data-table" id="historyTable">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Question</th>
+                    <th>Badge</th>
+                    <th>Confidence</th>
+                    <th>Latency</th>
+                </tr>
+            </thead>
+            <tbody id="historyTableBody">
+                <!-- Populated via JS -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => loadHistory());
+</script>
+{% endblock %}
