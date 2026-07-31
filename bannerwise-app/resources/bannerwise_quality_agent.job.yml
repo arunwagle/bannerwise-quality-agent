@@ -1,5 +1,8 @@
 resources:
   jobs:
+    # ─────────────────────────────────────────────────────────────
+    # Setup Job — Creates data model and populates synthetic data
+    # ─────────────────────────────────────────────────────────────
     setup_job:
       name: 'bannerwise-quality-agent-setup'
       description: 'Creates data model tables and populates with synthetic data'
@@ -27,10 +30,148 @@ resources:
           depends_on:
             - task_key: create_tables
           notebook_task:
-            notebook_path: ../notebooks/generate_synthetic_data
+            notebook_path: ../tests/notebooks/setup_test_data
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
+
+      queue:
+        enabled: true
+
+    # ─────────────────────────────────────────────────────────────
+    # Router Agent Job — Invokes the supervisor agent for a prompt
+    # ─────────────────────────────────────────────────────────────
+    router_agent_job:
+      name: 'bannerwise-quality-agent-router'
+      description: 'Invokes the Bannerwise Quality Router supervisor agent to assess a user prompt'
+      tags:
+        project: bannerwise-quality-agent
+        purpose: router-agent
+
+      parameters:
+        - name: prompt
+          default: ''
+        - name: catalog_name
+          default: aw_serverless_stable_catalog
+        - name: schema_name
+          default: bannerhealth
+        - name: vs_endpoint
+          default: bannerwise-vs-endpoint
+        - name: vs_top_k
+          default: '3'
+        - name: confidence_threshold
+          default: '0.85'
+        - name: shrink_factor
+          default: '0.95'
+        - name: judge_model
+          default: databricks-meta-llama-3-3-70b-instruct
+        - name: genie_space_id
+          default: ''
+        - name: genie_timeout_sec
+          default: '30'
+        - name: sql_warehouse_id
+          default: 2d8e531640ffa469
+
+      tasks:
+        - task_key: run_router_agent
+          description: 'Execute the supervisor agent with the given prompt and configuration'
+          notebook_task:
+            notebook_path: ../notebooks/router_agent
+            base_parameters:
+              prompt: '{{job.parameters.prompt}}'
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+              vs_endpoint: '{{job.parameters.vs_endpoint}}'
+              vs_top_k: '{{job.parameters.vs_top_k}}'
+              confidence_threshold: '{{job.parameters.confidence_threshold}}'
+              shrink_factor: '{{job.parameters.shrink_factor}}'
+              judge_model: '{{job.parameters.judge_model}}'
+              genie_space_id: '{{job.parameters.genie_space_id}}'
+              genie_timeout_sec: '{{job.parameters.genie_timeout_sec}}'
+              sql_warehouse_id: '{{job.parameters.sql_warehouse_id}}'
+
+      queue:
+        enabled: true
+
+    # ─────────────────────────────────────────────────────────────
+    # Eval Job — Pre-deploy quality gate for the router agent
+    # Generates eval dataset, runs router eval, checks thresholds
+    # ─────────────────────────────────────────────────────────────
+    eval_job:
+      name: 'bannerwise-quality-agent-eval'
+      description: 'Pre-deploy quality gate: generates eval dataset, evaluates router, asserts metric thresholds'
+      tags:
+        project: bannerwise-quality-agent
+        purpose: evaluation
+
+      parameters:
+        - name: catalog_name
+          default: aw_serverless_stable_catalog
+        - name: schema_name
+          default: bannerhealth
+        - name: num_paraphrases
+          default: '7'
+        - name: num_near_misses
+          default: '4'
+        - name: num_colloquial
+          default: '3'
+        - name: num_param_variations
+          default: '3'
+        - name: judge_model
+          default: databricks-meta-llama-3-3-70b-instruct
+        - name: regenerate_dataset
+          default: 'true'
+        - name: min_precision
+          default: '0.95'
+        - name: min_recall
+          default: '0.80'
+        - name: confidence_threshold
+          default: '0.85'
+        - name: vs_endpoint
+          default: bannerwise-vs-endpoint
+        - name: sql_warehouse_id
+          default: 2d8e531640ffa469
+
+      tasks:
+        - task_key: generate_eval_dataset
+          description: 'LLM-powered eval dataset generation from certified corpus'
+          notebook_task:
+            notebook_path: ../tests/notebooks/generate_eval_dataset
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+              num_paraphrases: '{{job.parameters.num_paraphrases}}'
+              num_near_misses: '{{job.parameters.num_near_misses}}'
+              num_colloquial: '{{job.parameters.num_colloquial}}'
+              num_param_variations: '{{job.parameters.num_param_variations}}'
+              judge_model: '{{job.parameters.judge_model}}'
+              regenerate_dataset: '{{job.parameters.regenerate_dataset}}'
+
+        - task_key: run_router_eval
+          description: 'Run router on every eval row, score with MLflow Evaluate'
+          depends_on:
+            - task_key: generate_eval_dataset
+          notebook_task:
+            notebook_path: ../tests/notebooks/run_router_eval
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+              confidence_threshold: '{{job.parameters.confidence_threshold}}'
+              vs_endpoint: '{{job.parameters.vs_endpoint}}'
+              judge_model: '{{job.parameters.judge_model}}'
+              sql_warehouse_id: '{{job.parameters.sql_warehouse_id}}'
+
+        - task_key: check_eval_thresholds
+          description: 'Assert primary metrics meet deployment gates — FAILS job if below targets'
+          depends_on:
+            - task_key: run_router_eval
+          notebook_task:
+            notebook_path: ../tests/notebooks/check_eval_thresholds
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+              min_precision: '{{job.parameters.min_precision}}'
+              min_recall: '{{job.parameters.min_recall}}'
 
       queue:
         enabled: true
