@@ -233,23 +233,27 @@ def rerank_and_calibrate(
     prompt and the top candidate's certified question. Returns calibrated
     confidence in [0.0, 1.0].
     """
-    judge_prompt = f"""You are an intent matching judge. Compare these two questions and score how similar their intent is.
+    judge_prompt = f"""You are an intent matching judge. Compare a user question against a certified question template.
+
+IMPORTANT: The certified question may contain parameter placeholders in curly braces like {{period}}, {{campaign}}, {{metric}}, {{format}}, {{channel}}.
+These placeholders match ANY concrete value. For example:
+- "What is the total ad spend for {{period}}?" matches "What is the total ad spend for Q1 2025?" (score: 95+)
+- "What was the ROI for the {{campaign}} campaign?" matches "What was the ROI for the spring_sale campaign?" (score: 95+)
+
+Score the intent similarity from 0 to 100:
+- 90-100 = same intent, user is asking the exact same question (possibly with concrete values filling placeholders, or minor rewording)
+- 75-89 = very similar intent with slight differences in scope or phrasing
+- 50-74 = related topic but different specific ask or different aggregation
+- 0-49 = different intent entirely
 
 User question: "{prompt}"
-Certified question: "{candidate.question}"
-
-Score the intent similarity from 0 to 100 where:
-- 100 = identical intent (same question, possibly different wording)
-- 75-99 = very similar intent (asking about the same metric/topic with minor differences)
-- 50-74 = related but different specific ask
-- 0-49 = different intent entirely
+Certified template: "{candidate.question}"
 
 Respond with ONLY a JSON object: {{"score": <number>, "reasoning": "<brief explanation>"}}"""
 
-    client = OpenAI(
-        api_key=os.environ.get("DATABRICKS_TOKEN", ""),
-        base_url=f"{os.environ.get('DATABRICKS_HOST', '')}/serving-endpoints"
-    )
+    token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+    host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().get()
+    client = OpenAI(api_key=token, base_url=f"{host}/serving-endpoints")
 
     try:
         response = client.chat.completions.create(
@@ -414,10 +418,9 @@ Return ONLY a JSON object mapping parameter names to their extracted values.
 If a parameter value is not found in the question, use a reasonable default.
 Example: {{"period": "Q1 2025", "campaign": "spring_sale"}}"""
 
-    client = OpenAI(
-        api_key=os.environ.get("DATABRICKS_TOKEN", ""),
-        base_url=f"{os.environ.get('DATABRICKS_HOST', '')}/serving-endpoints"
-    )
+    token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+    host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().get()
+    client = OpenAI(api_key=token, base_url=f"{host}/serving-endpoints")
 
     try:
         response = client.chat.completions.create(

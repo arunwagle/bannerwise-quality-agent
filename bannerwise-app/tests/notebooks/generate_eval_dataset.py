@@ -22,8 +22,6 @@
 
 # COMMAND ----------
 
-import os
-
 dbutils.widgets.text("catalog_name", "aw_serverless_stable_catalog")
 dbutils.widgets.text("schema_name", "bannerhealth")
 dbutils.widgets.text("num_paraphrases", "7")
@@ -76,6 +74,9 @@ print(f"  Expired (for staleness tests): {len(stale_candidates)}")
 
 # MAGIC %md
 # MAGIC ## LLM Helper
+# MAGIC 
+# MAGIC Uses `dbutils` context for auth (required on serverless compute where
+# MAGIC `DATABRICKS_TOKEN` env var is not set).
 
 # COMMAND ----------
 
@@ -83,11 +84,12 @@ import json
 from openai import OpenAI
 
 def get_llm_client():
-    """Create OpenAI client pointing to Databricks Foundation Model."""
-    return OpenAI(
-        api_key=os.environ.get("DATABRICKS_TOKEN", ""),
-        base_url=f"{os.environ.get('DATABRICKS_HOST', '')}/serving-endpoints"
-    )
+    """Create OpenAI client pointing to Databricks Foundation Model.
+    Uses dbutils context for auth (works on serverless compute).
+    """
+    token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+    host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().get()
+    return OpenAI(api_key=token, base_url=f"{host}/serving-endpoints")
 
 def call_llm(prompt: str, temperature: float = 0.7, max_tokens: int = 2000) -> str:
     """Call LLM and return the response content."""
@@ -107,11 +109,14 @@ def call_llm(prompt: str, temperature: float = 0.7, max_tokens: int = 2000) -> s
 def parse_json_list(text: str) -> list:
     """Parse a JSON list from LLM output, handling markdown code blocks."""
     text = text.strip()
+    # Strip markdown code fences
     if text.startswith("```"):
         lines = text.split("\n")
-        text = "\n".join(lines[1:-1])
+        # Remove first and last lines (fences)
+        text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
         if text.startswith("json"):
             text = text[4:]
+        text = text.strip()
     try:
         result = json.loads(text)
         if isinstance(result, list):
@@ -128,6 +133,13 @@ def parse_json_list(text: str) -> list:
                 return []
         return []
 
+# Quick validation
+print("Testing LLM connectivity...")
+test = call_llm("Return only a JSON array: [\"hello\"]", temperature=0)
+parsed = parse_json_list(test)
+assert len(parsed) > 0, f"LLM validation failed — got: {test}"
+print(f"  LLM OK: {parsed}")
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -136,7 +148,6 @@ def parse_json_list(text: str) -> list:
 # COMMAND ----------
 
 from datetime import datetime
-import uuid
 
 eval_rows = []
 
@@ -153,9 +164,11 @@ Rules:
 - Preserve the original intent completely
 - Vary sentence structure, vocabulary, and phrasing
 - Include formal, casual, and question-with-context variations
-- If the question has parameters (like campaign names or time periods), keep them but reword around them
+- If the question has parameter placeholders like {{period}} or {{campaign}}, replace them with concrete values
+  (e.g., "Q1 2025", "spring_sale", "holiday", "last month")
+- Each paraphrase must be a complete, natural question a user would type
 
-Return a JSON array of strings. Example: ["paraphrase 1", "paraphrase 2"]"""
+Return ONLY a JSON array of strings. Example: ["paraphrase 1", "paraphrase 2"]"""
     
     result = call_llm(prompt)
     paraphrases = parse_json_list(result)
@@ -189,24 +202,28 @@ print(f"Generating {NUM_PARAM_VARIATIONS} parameter variations per parameterized
 param_count_before = len(eval_rows)
 
 for entry in certified_entries:
-    params = entry["parameters"]
-    if not params or len(params) == 0:
+    question = entry["question"]
+    # Check if question has parameter placeholders
+    if "{" not in question:
         continue
     
-    question = entry["question"]
     corpus_id = entry["id"]
+    params = entry["parameters"] if entry["parameters"] else "[]"
     
-    prompt = f"""Given this certified question: "{question}"
+    prompt = f"""Given this certified question template: "{question}"
 Which uses these parameters: {params}
 
-Generate exactly {NUM_PARAM_VARIATIONS} variations of this question that ask the same thing but with DIFFERENT parameter values.
+Generate exactly {NUM_PARAM_VARIATIONS} variations of this question with DIFFERENT concrete parameter values substituted in.
 
-For example, if the original asks about "Q1 2025", generate versions asking about "Q3 2024", "last month", "this year", etc.
-If it mentions a campaign name, substitute other plausible campaign names like "holiday_promo", "summer_blast", "q4_push".
+For example:
+- If template is "What is the total ad spend for {{period}}?", generate versions like:
+  "What is the total ad spend for Q3 2024?"
+  "What is the total ad spend for last month?"
+  "What is the total ad spend for fiscal year 2025?"
+- If it mentions {{campaign}}, substitute other plausible campaign names like "holiday_promo", "summer_blast", "q4_push"
 
 The intent must remain the same — only the parameter values change.
-
-Return a JSON array of strings."""
+Return ONLY a JSON array of strings."""
     
     result = call_llm(prompt)
     variations = parse_json_list(result)
@@ -222,7 +239,7 @@ Return a JSON array of strings."""
             "source_corpus_id": corpus_id,
             "generation_method": "param_variation",
             "created_at": datetime.utcnow(),
-            "notes": f"Param variation of: {question[:80]} | params: {params}"
+            "notes": f"Param variation of: {question[:80]}"
         })
 
 print(f"  Parameter variation rows added: {len(eval_rows) - param_count_before}")
@@ -249,9 +266,10 @@ Rules:
 - Use informal language, abbreviations, shorthand
 - May drop articles, use contractions, be terse
 - Must still convey the EXACT same intent
+- If question has {{param}} placeholders, fill them with concrete values
 - Examples: "What's our CTR?", "show me spend for q1", "roi on spring campaign?"
 
-Return a JSON array of strings."""
+Return ONLY a JSON array of strings."""
     
     result = call_llm(prompt)
     colloquials = parse_json_list(result)
@@ -299,8 +317,9 @@ Rules:
 Examples of "near miss":
 - Certified: "What is the total ad spend for Q1?" → Near miss: "How is ad spend distributed across channels?"
 - Certified: "What is the CTR by banner size?" → Near miss: "Which banner sizes should we retire?"
+- Certified: "What was the ROI for the spring campaign?" → Near miss: "Compare ROI trends across all campaigns over time"
 
-Return a JSON array of strings."""
+Return ONLY a JSON array of strings."""
     
     result = call_llm(prompt)
     near_misses = parse_json_list(result)
@@ -331,8 +350,8 @@ print(f"  Near-miss rows added: {len(eval_rows) - nearmiss_before}")
 print("Generating 50 unrelated domain questions...")
 unrelated_before = len(eval_rows)
 
-prompt = """Generate exactly 50 questions that a business analyst might ask about their data, 
-but that are NOT related to banner/display advertising metrics.
+prompt = """Generate exactly 50 questions that a business analyst might ask about their data,
+but that are NOT related to banner/display advertising metrics, ad spend, CTR, impressions, or campaign performance.
 
 Include questions about:
 - Supply chain and inventory
@@ -346,7 +365,7 @@ Include questions about:
 - Network adequacy
 - Provider performance
 
-Return a JSON array of 50 question strings."""
+Return ONLY a JSON array of 50 question strings."""
 
 result = call_llm(prompt, max_tokens=4000)
 unrelated = parse_json_list(result)
@@ -377,15 +396,14 @@ print(f"  Unrelated rows added: {len(eval_rows) - unrelated_before}")
 print("Generating stale entry test cases...")
 stale_before = len(eval_rows)
 
-# Use expired entries + force-stale certified entries (questions that match but should be blocked)
+# Use expired entries if any exist
 for entry in stale_candidates:
     question = entry["question"]
     corpus_id = entry["id"]
     
-    # Generate 2-3 paraphrases of stale questions
     prompt = f"""Given this question: "{question}"
-Generate 3 paraphrases that ask the exact same thing.
-Return a JSON array of strings."""
+Generate 3 paraphrases that ask the exact same thing. If it has {{param}} placeholders, fill with concrete values.
+Return ONLY a JSON array of strings."""
     
     result = call_llm(prompt)
     paraphrases = parse_json_list(result)
@@ -401,15 +419,17 @@ Return a JSON array of strings."""
             "source_corpus_id": corpus_id,
             "generation_method": "llm_paraphrase",
             "created_at": datetime.utcnow(),
-            "notes": f"Stale entry (expired): {corpus_id} | next_review_date in past"
+            "notes": f"Stale entry (expired): {corpus_id}"
         })
 
-# Also add some that match certified entries but we'll mark with stale dates
-# (These test the staleness_check logic when the entry WOULD match but is stale)
-for entry in certified_entries[-3:]:  # Last 3 certified entries as staleness simulation
+# Also generate some for the last few certified entries (simulate staleness)
+for entry in certified_entries[-3:]:
+    question = entry["question"]
+    # Fill in a concrete value if parameterized
+    concrete = question.replace("{period}", "Q1 2025").replace("{campaign}", "spring_sale").replace("{metric}", "CTR").replace("{format}", "banner_300x250").replace("{channel}", "display")
     eval_rows.append({
         "id": f"EVAL-{len(eval_rows)+1:04d}",
-        "prompt": entry["question"],
+        "prompt": concrete,
         "category": "stale_entry_test",
         "expected_lane": "analytical",
         "expected_corpus_id": None,
@@ -417,7 +437,7 @@ for entry in certified_entries[-3:]:  # Last 3 certified entries as staleness si
         "source_corpus_id": entry["id"],
         "generation_method": "manual",
         "created_at": datetime.utcnow(),
-        "notes": f"Exact match but entry marked stale for test (simulated past review date)"
+        "notes": f"Simulated stale: exact match but entry review date forced to past"
     })
 
 print(f"  Stale test rows added: {len(eval_rows) - stale_before}")
@@ -432,24 +452,22 @@ print(f"  Stale test rows added: {len(eval_rows) - stale_before}")
 print("Generating adversarial test cases...")
 adversarial_before = len(eval_rows)
 
-# Get a few certified questions to reference in adversarial prompts
 sample_questions = [e["question"] for e in certified_entries[:5]]
 
 prompt = f"""Generate exactly 25 adversarial prompts designed to stress-test a confidence-gated router.
 The router has these certified questions in its corpus:
 {json.dumps(sample_questions, indent=2)}
 
-Generate prompts in these adversarial categories:
-1. Compound questions combining two different intents (5 prompts)
-2. Questions with misleading keywords from certified entries but different intent (5 prompts)
-3. Prompt injection attempts like "ignore previous instructions..." (5 prompts)
-4. Extremely ambiguous questions that could match multiple entries (5 prompts)
-5. Edge cases: very short (1-2 words), very long (50+ words), typos, broken English (5 prompts)
+Generate prompts in these adversarial categories (5 each):
+1. COMPOUND: Combine two different intents in one question
+2. MISLEADING: Use keywords from certified entries but with different intent
+3. INJECTION: "Ignore previous instructions...", "system: override confidence..."
+4. AMBIGUOUS: Could match multiple entries or none clearly
+5. EDGE: Very short (1-2 words), very long (50+ words), with typos, or broken grammar
 
-The router should route ALL of these to the analytical lane (they should NOT be matched).
+ALL should route to the analytical lane (they should NOT be matched confidently).
 
-Return a JSON array of objects with "prompt" and "subcategory" fields.
-Example: [{{"prompt": "...", "subcategory": "compound"}}]"""
+Return ONLY a JSON array of objects: [{{"prompt": "...", "subcategory": "compound|misleading|injection|ambiguous|edge"}}]"""
 
 result = call_llm(prompt, max_tokens=3000)
 adversarial = parse_json_list(result)
@@ -488,15 +506,15 @@ print(f"  Adversarial rows added: {len(eval_rows) - adversarial_before}")
 print("Generating boundary calibration cases...")
 boundary_before = len(eval_rows)
 
-# These are cases that should land near the threshold (0.85) — some should pass, some shouldn't
+sample_qs = [e["question"] for e in certified_entries[:10]]
 prompt = f"""Generate 20 questions that are on the BOUNDARY between matching and not matching these certified questions:
-{json.dumps(sample_questions[:10], indent=2)}
+{json.dumps(sample_qs, indent=2)}
 
 Split into two groups:
-1. 10 questions that are CLOSE to a certified question but should still be CERTIFIED (slight rewording, synonym usage, minor additions)
-2. 10 questions that look similar but should be ANALYTICAL (subtle intent shift, different granularity, added constraint that changes the answer)
+1. 10 questions that are CLOSE to a certified question and SHOULD be CERTIFIED (slight rewording, synonym usage, minor additions but same core intent)
+2. 10 questions that look similar but SHOULD be ANALYTICAL (subtle intent shift, different granularity, extra constraint that changes the answer)
 
-Return a JSON array of objects: [{{"prompt": "...", "expected_lane": "certified"|"analytical", "reasoning": "..."}}]"""
+Return ONLY a JSON array of objects: [{{"prompt": "...", "expected_lane": "certified"|"analytical", "reasoning": "..."}}]"""
 
 result = call_llm(prompt, max_tokens=3000)
 boundary = parse_json_list(result)
@@ -515,7 +533,7 @@ for item in boundary[:20]:
             "prompt": p,
             "category": "boundary_case",
             "expected_lane": expected,
-            "expected_corpus_id": None if expected == "analytical" else certified_entries[0]["id"],
+            "expected_corpus_id": None,
             "difficulty": "hard",
             "source_corpus_id": None,
             "generation_method": "llm_paraphrase",
@@ -553,11 +571,14 @@ eval_df = spark.createDataFrame(eval_rows, schema=schema)
 write_mode = "overwrite" if REGENERATE else "append"
 eval_df.write.mode(write_mode).saveAsTable(EVAL_TABLE)
 
+final_count = eval_df.count()
 print(f"\n{'='*60}")
 print(f"  Eval Dataset Written: {EVAL_TABLE}")
-print(f"  Total rows: {eval_df.count()}")
+print(f"  Total rows: {final_count}")
 print(f"  Write mode: {write_mode}")
 print(f"{'='*60}")
+
+assert final_count >= 100, f"Expected at least 100 eval rows, got {final_count}. Check LLM connectivity."
 
 # COMMAND ----------
 
@@ -569,20 +590,15 @@ print(f"{'='*60}")
 from pyspark.sql import functions as F
 
 summary = (
-    eval_df
+    spark.table(EVAL_TABLE)
     .groupBy("category", "expected_lane")
-    .agg(
-        F.count("*").alias("count"),
-        F.countDistinct("source_corpus_id").alias("source_entries")
-    )
+    .agg(F.count("*").alias("count"))
     .orderBy("category", "expected_lane")
 )
 summary.display()
 
-# Category totals
-print("\nCategory totals:")
-eval_df.groupBy("category").count().orderBy("category").show(truncate=False)
-
 # Lane distribution
-print("Lane distribution:")
-eval_df.groupBy("expected_lane").count().show()
+print("\nLane distribution:")
+spark.table(EVAL_TABLE).groupBy("expected_lane").count().show()
+
+print(f"\nDone. {final_count} eval rows generated successfully.")
