@@ -1,0 +1,36 @@
+resources:
+  jobs:
+    setup_job:
+      name: 'bannerwise-quality-agent-setup'
+      description: 'Creates data model tables and populates with synthetic data'
+      tags:
+        project: bannerwise-quality-agent
+        purpose: setup
+
+      parameters:
+        - name: catalog_name
+          default: aw_serverless_stable_catalog
+        - name: schema_name
+          default: bannerhealth
+
+      tasks:
+        - task_key: create_tables
+          description: 'Run DDL to create data model tables (if not exist)'
+          notebook_task:
+            notebook_path: ../notebooks/create_tables
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+
+        - task_key: generate_synthetic_data
+          description: 'Populate tables with synthetic test data using dbldatagen'
+          depends_on:
+            - task_key: create_tables
+          notebook_task:
+            notebook_path: ../notebooks/generate_synthetic_data
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+
+      queue:
+        enabled: true

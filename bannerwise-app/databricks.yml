@@ -1,19 +1,8 @@
 bundle:
   name: bannerwise_quality_agent
 
-resources:
-  apps:
-    bannerwise_quality_agent:
-      name: '${workspace.current_user.domain_friendly_name}-bannerwise-quality-agent'
-      source_code_path: ./apps
-      description: 'Bannerwise Quality Agent — AI-powered banner quality assessment app'
-
-      user_api_scopes:
-        - 'files'
-
-      permissions:
-        - level: CAN_USE
-          group_name: users
+include:
+  - resources/*.yml
 
 targets:
   dev:

@@ -13,11 +13,24 @@
             <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
                 <span class="hamburger"></span>
             </button>
-            <h1 class="app-title">Bannerwise Quality Agent</h1>
+            <a href="/" class="header-brand">
+                <img src="{{ url_for('static', filename='images/banner-health-logo.svg') }}"
+                     alt="Banner Health"
+                     class="brand-logo" />
+                <span class="brand-divider"></span>
+                <span class="brand-product">Quality Agent</span>
+            </a>
         </div>
         <div class="header-right">
-            <span class="status-indicator healthy" title="System healthy"></span>
-            <span class="user-name">arun.wagle@databricks.com</span>
+            <div class="header-status">
+                <span class="status-indicator healthy" title="All systems healthy"></span>
+                <span class="status-text">Healthy</span>
+            </div>
+            <div class="header-divider"></div>
+            <div class="header-user">
+                <div class="user-avatar">AW</div>
+                <span class="user-name">arun.wagle@databricks.com</span>
+            </div>
         </div>
     </header>
 
@@ -50,6 +63,13 @@
                     </a>
                 </li>
             </ul>
+
+            <div class="nav-footer">
+                <div class="nav-footer-badge">
+                    <span class="nav-icon">&#x1F6E1;</span>
+                    <span class="nav-label">v0.1.0</span>
+                </div>
+            </div>
         </nav>
 
         <!-- Right Content Area -->
