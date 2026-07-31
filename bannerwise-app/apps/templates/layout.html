@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Bannerwise Quality Agent{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <nav>
+            <h1>Bannerwise Quality Agent</h1>
+        </nav>
+    </header>
+
+    <main>
+        {% block content %}
+        <div class="container">
+            <h2>Welcome to Bannerwise Quality Agent</h2>
+            <p>AI-powered banner quality assessment.</p>
+        </div>
+        {% endblock %}
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Bannerwise Quality Agent</p>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
