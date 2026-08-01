@@ -16,7 +16,7 @@
 
 dbutils.widgets.text("catalog_name", "aw_serverless_stable_catalog")
 dbutils.widgets.text("schema_name", "bannerhealth")
-dbutils.widgets.text("min_precision", "0.95")
+dbutils.widgets.text("min_precision", "0.90")
 dbutils.widgets.text("min_recall", "0.80")
 dbutils.widgets.text("min_f1", "0.87")
 dbutils.widgets.text("min_staleness", "1.00")

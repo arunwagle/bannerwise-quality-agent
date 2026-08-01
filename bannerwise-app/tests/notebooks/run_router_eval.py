@@ -24,7 +24,7 @@
 
 dbutils.widgets.text("catalog_name", "aw_serverless_stable_catalog")
 dbutils.widgets.text("schema_name", "bannerhealth")
-dbutils.widgets.text("confidence_threshold", "0.85")
+dbutils.widgets.text("confidence_threshold", "0.83")
 dbutils.widgets.text("shrink_factor", "1.0")
 dbutils.widgets.text("vs_endpoint", "bannerwise-vs-endpoint")
 dbutils.widgets.text("vs_top_k", "3")

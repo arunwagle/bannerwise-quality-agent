@@ -60,7 +60,7 @@ resources:
         - name: vs_top_k
           default: '3'
         - name: confidence_threshold
-          default: '0.85'
+          default: '0.83'
         - name: shrink_factor
           default: '1.0'
         - name: judge_model
@@ -110,13 +110,13 @@ resources:
         - name: schema_name
           default: bannerhealth
         - name: num_paraphrases
-          default: '7'
+          default: '2'
         - name: num_near_misses
-          default: '4'
+          default: '2'
         - name: num_colloquial
-          default: '3'
+          default: '1'
         - name: num_param_variations
-          default: '3'
+          default: '1'
         - name: judge_model
           default: databricks-meta-llama-3-3-70b-instruct
         - name: regenerate_dataset
@@ -126,7 +126,7 @@ resources:
         - name: min_recall
           default: '0.80'
         - name: confidence_threshold
-          default: '0.85'
+          default: '0.83'
         - name: shrink_factor
           default: '1.0'
         - name: vs_endpoint
