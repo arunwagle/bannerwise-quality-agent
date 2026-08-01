@@ -156,7 +156,7 @@ resources:
           depends_on:
             - task_key: generate_eval_dataset
           notebook_task:
-            notebook_path: ../tests/notebooks/run_router_eval
+            notebook_path: ../tests/notebooks/run_router_eval_v2
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
