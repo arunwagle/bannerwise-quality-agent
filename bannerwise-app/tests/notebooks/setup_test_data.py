@@ -134,7 +134,7 @@ for i, (q, sql, tmpl) in enumerate(zip(CERTIFIED_QUESTIONS, SQL_TEMPLATES, ANSWE
     
     certifier = random.choice(CERTIFIERS) if status == "certified" else None
     cert_date = datetime(2025, random.randint(1,4), random.randint(1,28)) if status == "certified" else None
-    review_date = date(2025, random.randint(7,12), random.randint(1,28)) if status != "expired" else date(2025, 2, 1)
+    review_date = date.today() + timedelta(days=random.randint(90, 270)) if status != "expired" else date.today() - timedelta(days=random.randint(90, 365))
     
     corpus_rows.append({
         "id": f"QA-{i+1:04d}",
