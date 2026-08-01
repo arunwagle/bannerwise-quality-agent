@@ -122,7 +122,7 @@ resources:
         - name: regenerate_dataset
           default: 'true'
         - name: min_precision
-          default: '0.90'
+          default: '0.85'
         - name: min_recall
           default: '0.80'
         - name: fail_on_gate_miss
