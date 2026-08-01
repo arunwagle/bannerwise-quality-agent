@@ -62,7 +62,7 @@ resources:
         - name: confidence_threshold
           default: '0.85'
         - name: shrink_factor
-          default: '0.95'
+          default: '1.0'
         - name: judge_model
           default: databricks-meta-llama-3-3-70b-instruct
         - name: genie_space_id
@@ -122,11 +122,13 @@ resources:
         - name: regenerate_dataset
           default: 'true'
         - name: min_precision
-          default: '0.95'
+          default: '1.0'
         - name: min_recall
           default: '0.80'
         - name: confidence_threshold
           default: '0.85'
+        - name: shrink_factor
+          default: '1.0'
         - name: vs_endpoint
           default: bannerwise-vs-endpoint
         - name: sql_warehouse_id
@@ -159,6 +161,7 @@ resources:
               confidence_threshold: '{{job.parameters.confidence_threshold}}'
               vs_endpoint: '{{job.parameters.vs_endpoint}}'
               judge_model: '{{job.parameters.judge_model}}'
+              shrink_factor: '{{job.parameters.shrink_factor}}'
               sql_warehouse_id: '{{job.parameters.sql_warehouse_id}}'
 
         - task_key: check_eval_thresholds
