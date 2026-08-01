@@ -228,71 +228,39 @@ def rerank_and_calibrate(
     candidate: Candidate,
     shrink_factor: float = SHRINK_FACTOR
 ) -> float:
-    """
-    Step 3: Use an LLM judge to assess intent alignment between the user
-    prompt and the top candidate's certified question. Returns calibrated
-    confidence in [0.0, 1.0].
-    """
-    judge_prompt = f"""You are an intent matching judge. Compare a user question against a certified question template.
+    """Binary judge: asks LLM if the intent matches (YES/NO), not a numeric score.
+    Returns 1.0 for MATCH, 0.0 for NO_MATCH. Eliminates score calibration issues.
+    shrink_factor is kept for API compatibility but not used in binary mode."""
+    judge_prompt = f"""You are an intent matching judge. Determine if the user question asks the SAME thing as the certified question template.
 
-IMPORTANT: The certified question may contain parameter placeholders in curly braces like {{period}}, {{campaign}}, {{metric}}, {{format}}, {{channel}}.
+IMPORTANT: The certified question may contain parameter placeholders in curly braces like {{period}}, {{campaign}}, {{metric}}.
 These placeholders match ANY concrete value. For example:
-- "What is the total ad spend for {{period}}?" matches "What is the total ad spend for Q1 2025?" (score: 95+)
-- "What was the ROI for the {{campaign}} campaign?" matches "What was the ROI for the spring_sale campaign?" (score: 95+)
+- Template: "What is the total ad spend for {{period}}?" MATCHES "What is the total ad spend for Q1 2025?"
+- Template: "What was the ROI for the {{campaign}} campaign?" MATCHES "What was the ROI for the holiday campaign?"
 
-Score the intent similarity from 0 to 100:
-- 90-100 = IDENTICAL intent. The user is asking the exact same question (with parameter substitution, rewording, or colloquial phrasing). The same SQL query would answer both.
-- 70-89 = SAME metric/topic but with a MINOR scope or detail difference that the certified SQL could still handle
-- 40-69 = RELATED topic but DIFFERENT specific ask (different metric, different aggregation, different breakdown, different time granularity). Score here even if keywords overlap heavily.
-- 0-39 = UNRELATED intent entirely
+A question MATCHES if:
+- It asks for the SAME metric/data (even if worded differently)
+- The same SQL query (with parameter substitution) would answer both
+- It's a paraphrase, casual rewrite, or reformulation of the template
 
-CRITICAL: If the user asks for a BREAKDOWN, COMPARISON, TREND, PREDICTION, or any analysis the certified question does NOT cover, score 40-69 maximum — even if keywords overlap. The certified template answers ONE specific question; anything beyond that scope is a different intent.
+A question does NOT MATCH if:
+- It asks for a DIFFERENT metric, breakdown, comparison, trend, or prediction
+- It requires a fundamentally different query to answer
+- It only shares keywords but has a different intent
 
 User question: "{prompt}"
 Certified template: "{candidate.question}"
 
-Respond with ONLY a JSON object: {{"score": <number>, "reasoning": "<brief explanation>"}}"""
+Answer with ONLY one word: MATCH or NO_MATCH"""
 
-    token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
-    host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().get()
-    client = OpenAI(api_key=token, base_url=f"{host}/serving-endpoints")
-
-    try:
-        response = client.chat.completions.create(
-            model=JUDGE_MODEL,
-            messages=[{"role": "user", "content": judge_prompt}],
-            temperature=0.0,
-            max_tokens=150
-        )
-        content = response.choices[0].message.content.strip()
-
-        # Parse the JSON response
-        # Handle cases where model wraps in markdown code blocks
-        if content.startswith("```"):
-            content = content.split("```")[1]
-            if content.startswith("json"):
-                content = content[4:]
-        
-        result = json.loads(content)
-        raw_score = float(result.get("score", 0))
-    except Exception as e:
-        # If judge fails, fall back to VS similarity score
-        raw_score = candidate.score * 100
-        mlflow.get_current_active_span().set_attribute("judge_error", str(e))
-
-    # Normalize to [0, 1] and apply shrink
-    normalized = min(max(raw_score / 100.0, 0.0), 1.0)
-    calibrated = normalized * shrink_factor
-
-    # Log span attributes
-    span = mlflow.get_current_active_span()
-    if span:
-        span.set_attribute("raw_score", raw_score)
-        span.set_attribute("normalized", normalized)
-        span.set_attribute("calibrated", calibrated)
-        span.set_attribute("shrink_factor", shrink_factor)
-
-    return calibrated
+    llm_response = _call_llm(judge_prompt)
+    
+    # Parse binary response
+    response_upper = llm_response.strip().upper().replace(".", "").replace('"', '').replace("'", "")
+    if "MATCH" in response_upper and "NO" not in response_upper:
+        return 1.0  # Confirmed match
+    else:
+        return 0.0  # Not a match
 
 # COMMAND ----------
 

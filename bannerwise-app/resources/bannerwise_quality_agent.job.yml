@@ -60,7 +60,7 @@ resources:
         - name: vs_top_k
           default: '3'
         - name: confidence_threshold
-          default: '0.65'
+          default: '0.5'
         - name: shrink_factor
           default: '1.0'
         - name: judge_model
@@ -128,7 +128,7 @@ resources:
         - name: fail_on_gate_miss
           default: 'true'
         - name: confidence_threshold
-          default: '0.65'
+          default: '0.5'
         - name: shrink_factor
           default: '1.0'
         - name: vs_endpoint
