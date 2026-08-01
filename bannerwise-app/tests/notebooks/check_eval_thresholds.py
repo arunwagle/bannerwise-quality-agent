@@ -20,6 +20,7 @@ dbutils.widgets.text("min_precision", "0.90")
 dbutils.widgets.text("min_recall", "0.80")
 dbutils.widgets.text("min_f1", "0.87")
 dbutils.widgets.text("min_staleness", "1.00")
+dbutils.widgets.text("fail_on_gate_miss", "true")
 
 CATALOG = dbutils.widgets.get("catalog_name")
 SCHEMA = dbutils.widgets.get("schema_name")
@@ -27,12 +28,14 @@ MIN_PRECISION = float(dbutils.widgets.get("min_precision"))
 MIN_RECALL = float(dbutils.widgets.get("min_recall"))
 MIN_F1 = float(dbutils.widgets.get("min_f1"))
 MIN_STALENESS = float(dbutils.widgets.get("min_staleness"))
+FAIL_ON_GATE_MISS = dbutils.widgets.get("fail_on_gate_miss").lower() == "true"
 
 print(f"Deployment Gate Thresholds:")
 print(f"  Min Precision:  {MIN_PRECISION}")
 print(f"  Min Recall:     {MIN_RECALL}")
 print(f"  Min F1:         {MIN_F1}")
 print(f"  Min Staleness:  {MIN_STALENESS}")
+print(f"  Fail on miss:   {FAIL_ON_GATE_MISS}")
 
 # COMMAND ----------
 
@@ -214,12 +217,13 @@ result = {
 
 if all_passed:
     print("\n All deployment gates PASSED. Router is ready for deployment.")
+    dbutils.notebook.exit(json.dumps(result))
 else:
     print(f"\n Deployment gates NOT MET: {', '.join(result['failed_gates'])}")
-    print("  This is informational — job will NOT fail.")
-    print("  Review false positives above and tune threshold or judge prompt.")
-
-# Always exit cleanly — report results without failing the job
-# To enable hard-fail mode for production CI/CD, set a job parameter
-# `fail_on_gate_miss=true` and uncomment the raise below.
-dbutils.notebook.exit(json.dumps(result))
+    if FAIL_ON_GATE_MISS:
+        # Hard-fail: blocks deployment in CI/CD pipeline
+        raise Exception(json.dumps(result))
+    else:
+        # Soft-fail: report results without failing the job (for dev iteration)
+        print("  fail_on_gate_miss=false — job will NOT fail. Review results above.")
+        dbutils.notebook.exit(json.dumps(result))

@@ -125,6 +125,8 @@ resources:
           default: '0.90'
         - name: min_recall
           default: '0.80'
+        - name: fail_on_gate_miss
+          default: 'true'
         - name: confidence_threshold
           default: '0.83'
         - name: shrink_factor
@@ -175,6 +177,7 @@ resources:
               schema_name: '{{job.parameters.schema_name}}'
               min_precision: '{{job.parameters.min_precision}}'
               min_recall: '{{job.parameters.min_recall}}'
+              fail_on_gate_miss: '{{job.parameters.fail_on_gate_miss}}'
 
       queue:
         enabled: true
