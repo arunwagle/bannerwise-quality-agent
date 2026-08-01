@@ -193,10 +193,12 @@ These placeholders match ANY concrete value. For example:
 - "What was the ROI for the {{campaign}} campaign?" matches "What was the ROI for the spring_sale campaign?" (score: 95+)
 
 Score the intent similarity from 0 to 100:
-- 90-100 = same intent, user is asking the exact same question (possibly with concrete parameter values filling placeholders, or minor rewording)
-- 75-89 = very similar intent with slight differences in scope or phrasing
-- 50-74 = related topic but different specific ask or different aggregation
-- 0-49 = different intent entirely
+- 90-100 = IDENTICAL intent. The user is asking the exact same question (with parameter substitution, rewording, or colloquial phrasing). The same SQL query would answer both.
+- 70-89 = SAME metric/topic but with a MINOR scope or detail difference that the certified SQL could still handle
+- 40-69 = RELATED topic but DIFFERENT specific ask (different metric, different aggregation, different breakdown, different time granularity). Score here even if keywords overlap heavily.
+- 0-39 = UNRELATED intent entirely
+
+CRITICAL: If the user asks for a BREAKDOWN, COMPARISON, TREND, PREDICTION, or any analysis the certified question does NOT cover, score 40-69 maximum — even if keywords overlap. The certified template answers ONE specific question; anything beyond that scope is a different intent.
 
 User question: "{prompt}"
 Certified template: "{candidate.question}"
