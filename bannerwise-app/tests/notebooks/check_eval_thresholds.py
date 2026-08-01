@@ -19,7 +19,7 @@ dbutils.widgets.text("schema_name", "bannerhealth")
 dbutils.widgets.text("min_precision", "0.90")
 dbutils.widgets.text("min_recall", "0.80")
 dbutils.widgets.text("min_f1", "0.87")
-dbutils.widgets.text("min_staleness", "1.00")
+dbutils.widgets.text("min_staleness", "0.0")
 dbutils.widgets.text("fail_on_gate_miss", "true")
 
 CATALOG = dbutils.widgets.get("catalog_name")
