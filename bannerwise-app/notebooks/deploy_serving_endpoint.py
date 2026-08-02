@@ -16,7 +16,6 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.serving import (
     EndpointCoreConfigInput,
     ServedEntityInput,
-    AutoCaptureConfigInput,
 )
 
 # COMMAND ----------
@@ -96,12 +95,6 @@ served_entities = [
 
 endpoint_config = EndpointCoreConfigInput(
     served_entities=served_entities,
-    auto_capture_config=AutoCaptureConfigInput(
-        catalog_name=CATALOG,
-        schema_name=SCHEMA,
-        table_name_prefix=f"{MODEL_NAME}_inference",
-        enabled=True,
-    ),
 )
 
 # Check if endpoint exists
@@ -111,12 +104,6 @@ try:
     w.serving_endpoints.update_config(
         name=ENDPOINT_NAME,
         served_entities=served_entities,
-        auto_capture_config=AutoCaptureConfigInput(
-            catalog_name=CATALOG,
-            schema_name=SCHEMA,
-            table_name_prefix=f"{MODEL_NAME}_inference",
-            enabled=True,
-        ),
     )
     print(f"✓ Endpoint updated to champion version {champion_version}")
 except Exception as e:
