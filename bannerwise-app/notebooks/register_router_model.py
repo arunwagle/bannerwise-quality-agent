@@ -261,8 +261,8 @@ print("\n✓ Model validation passed")
 
 # Set "challenger" alias on the new version
 client = mlflow.MlflowClient()
-versions = client.search_model_versions(f"name='{FULL_MODEL_NAME}'", order_by=["version_number DESC"], max_results=1)
-new_version = versions[0].version
+versions = client.search_model_versions(f"name='{FULL_MODEL_NAME}'")
+new_version = max(int(v.version) for v in versions)
 client.set_registered_model_alias(FULL_MODEL_NAME, "challenger", new_version)
 print(f"\n✓ Alias 'challenger' set → version {new_version}")
 
