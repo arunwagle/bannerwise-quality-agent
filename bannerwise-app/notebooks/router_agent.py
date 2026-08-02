@@ -257,10 +257,23 @@ Certified template: "{candidate.question}"
 
 Answer with ONLY one word: MATCH or NO_MATCH"""
 
-    llm_response = _call_llm(judge_prompt)
+    # Inline LLM call (no _call_llm helper in this notebook)
+    token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+    host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().get()
+    client = OpenAI(api_key=token, base_url=f"{host}/serving-endpoints")
+    try:
+        response = client.chat.completions.create(
+            model=JUDGE_MODEL,
+            messages=[{"role": "user", "content": judge_prompt}],
+            temperature=0.0,
+            max_tokens=10
+        )
+        llm_response = response.choices[0].message.content.strip()
+    except Exception as e:
+        llm_response = "NO_MATCH"  # Fail safe: route to analytical on error
     
     # Parse binary response
-    response_upper = llm_response.strip().upper().replace(".", "").replace('"', '').replace("'", "")
+    response_upper = llm_response.upper().replace(".", "").replace('"', '').replace("'", "")
     if "MATCH" in response_upper and "NO" not in response_upper:
         return 1.0  # Confirmed match
     else:
