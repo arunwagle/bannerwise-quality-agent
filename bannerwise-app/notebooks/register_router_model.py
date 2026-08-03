@@ -75,11 +75,25 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
         import json
 
         w = WorkspaceClient()
-        # In Model Serving, DATABRICKS_TOKEN is injected automatically
-        token = os.environ.get("DATABRICKS_TOKEN") or w.config.token
         host = os.environ.get("DATABRICKS_HOST", f"https://{w.config.host}")
         if not host.startswith("http"):
             host = f"https://{host}"
+
+        # Get token — works in Model Serving, serverless notebooks, and local
+        token = os.environ.get("DATABRICKS_TOKEN")  # Model Serving
+        if not token:
+            token = w.config.token  # PAT-based auth
+        if not token:
+            # OAuth/serverless: extract token from SDK credential provider
+            creds = w.config.authenticate()
+            if callable(creds):
+                auth_headers = creds()
+                if isinstance(auth_headers, dict):
+                    token = auth_headers.get("Authorization", "").replace("Bearer ", "")
+
+        if not token:
+            raise RuntimeError("Cannot obtain auth token for LLM calls")
+
         client = OpenAI(api_key=token, base_url=f"{host}/serving-endpoints")
 
         results = []
