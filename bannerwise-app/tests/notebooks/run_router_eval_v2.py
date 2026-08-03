@@ -88,7 +88,8 @@ eval_df.groupBy("category", "expected_lane").count().orderBy("category").show(tr
 # MAGIC %md
 # MAGIC ## Get Auth Credentials (Driver-Side)
 # MAGIC 
-# MAGIC Capture credentials on the driver so they can be broadcast to Spark executors.
+# MAGIC Capture credentials on the driver for use in mapInPandas executors.
+# MAGIC Uses raw HTTP on executors (avoids SDK serialization issues on Spark Connect).
 
 # COMMAND ----------
 
@@ -96,11 +97,7 @@ eval_df.groupBy("category", "expected_lane").count().orderBy("category").show(tr
 _driver_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
 _driver_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().get()
 
-# Broadcast credentials to all executors
-# (credentials passed via closure — no broadcast needed on serverless)
-# (Spark Connect serializes closure variables automatically)
-
-print(f"Auth captured and broadcast to executors")
+print(f"Auth captured for executor distribution")
 print(f"  Host: {_driver_host}")
 
 # COMMAND ----------
@@ -108,14 +105,16 @@ print(f"  Host: {_driver_host}")
 # MAGIC %md
 # MAGIC ## Router Eval Logic (Optimized)
 # MAGIC 
-# MAGIC Three key optimizations:
-# MAGIC 1. **Short-circuit**: VS score < 0.4 → skip judge entirely
-# MAGIC 2. **Batch judge**: Multiple prompt-pairs in a single LLM call
-# MAGIC 3. **mapInPandas**: Distributed across Spark executors
+# MAGIC Three optimizations:
+# MAGIC 1. **Spark mapInPandas** — distributes eval across executors
+# MAGIC 2. **Short-circuit**: VS score < 0.4 → skip judge entirely
+# MAGIC 3. **Batch judge**: Multiple prompt-pairs in a single LLM call
+# MAGIC 
+# MAGIC All helper functions are defined INSIDE the closure for proper Spark Connect serialization.
+# MAGIC Uses raw HTTP requests on executors (no SDK dependency on workers).
 
 # COMMAND ----------
 
-import json
 import time
 from datetime import date, datetime
 from typing import List, Dict, Any, Tuple
@@ -125,188 +124,78 @@ from pyspark.sql.types import *
 
 def _create_eval_function(driver_token, driver_host, vs_index, vs_top_k, judge_model,
                           confidence_threshold, vs_short_circuit_threshold, judge_batch_size):
-    """Factory that returns a mapInPandas-compatible function with captured config.
+    """Factory that creates a mapInPandas function with all helpers inside the closure.
     
-    Uses closure to pass broadcast variables and config to executors.
+    All dependencies (auth, helper functions) are captured in the closure so
+    Spark Connect can serialize everything to executors properly.
     """
 
     def eval_batch(pdf_iterator):
-        """Process batches of eval rows using mapInPandas.
+        """Process batches of eval rows on each executor.
         
-        For each partition:
-        1. Retrieves VS candidates for all rows
-        2. Short-circuits low-scoring rows (< threshold)
-        3. Batches remaining rows into grouped judge calls
+        All helper functions are defined here (inside the closure) to ensure
+        proper serialization via Spark Connect.
         """
-        from databricks.sdk import WorkspaceClient
-        from databricks.sdk.config import Config
+        import requests
+        import json
+        import time
+        from datetime import date
 
-        # Initialize SDK with broadcast credentials
-        config = Config(host=driver_host, token=driver_token)
-        w_exec = WorkspaceClient(config=config)
+        # --- Helper: Call LLM via raw HTTP (no SDK needed on executors) ---
+        def call_llm(prompt_text, max_tokens=10):
+            """Call Foundation Model API via raw HTTP POST."""
+            url = f"{driver_host}/serving-endpoints/{judge_model}/invocations"
+            headers = {
+                "Authorization": f"Bearer {driver_token}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "messages": [{"role": "user", "content": prompt_text}],
+                "temperature": 0.0,
+                "max_tokens": max_tokens,
+            }
+            resp = requests.post(url, headers=headers, json=payload, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"].strip()
 
-        for pdf in pdf_iterator:
-            results = []
+        # --- Helper: Query Vector Search via raw HTTP ---
+        def query_vs(prompt_text):
+            """Query Vector Search index via raw HTTP POST."""
+            url = f"{driver_host}/api/2.0/vector-search/indexes/{vs_index}/query"
+            headers = {
+                "Authorization": f"Bearer {driver_token}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "columns": ["id", "question", "status", "next_review_date"],
+                "query_text": prompt_text,
+                "num_results": vs_top_k,
+            }
+            resp = requests.post(url, headers=headers, json=payload, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
             
-            # --- Step 1: Retrieve VS candidates for all rows ---
-            vs_results_map = {}  # eval_id → (candidates, vs_score, latency)
-            for _, row in pdf.iterrows():
-                eval_id = row["id"]
-                prompt = row["prompt"]
-                start_time = time.time()
-                
-                try:
-                    vs_resp = w_exec.vector_search_indexes.query_index(
-                        index_name=vs_index,
-                        columns=["id", "question", "status", "next_review_date"],
-                        query_text=prompt,
-                        num_results=vs_top_k,
-                    )
-                    
-                    candidates = []
-                    if vs_resp and vs_resp.result and vs_resp.result.data_array:
-                        columns = [col.name for col in vs_resp.manifest.columns]
-                        for cand_row in vs_resp.result.data_array:
-                            row_dict = dict(zip(columns, cand_row))
-                            # VS score is the last column (similarity)
-                            vs_score = float(cand_row[-1]) if len(cand_row) > len(columns) else 0.0
-                            candidates.append({
-                                "corpus_id": row_dict.get("id", ""),
-                                "question": row_dict.get("question", ""),
-                                "status": row_dict.get("status", ""),
-                                "next_review_date": str(row_dict.get("next_review_date", "")),
-                                "vs_score": vs_score,
-                            })
-                    
-                    top_score = candidates[0]["vs_score"] if candidates else 0.0
-                    vs_results_map[eval_id] = (candidates, top_score, time.time() - start_time)
-                except Exception as e:
-                    vs_results_map[eval_id] = ([], 0.0, time.time() - start_time)
+            candidates = []
+            if data.get("result") and data["result"].get("data_array"):
+                columns = [col["name"] for col in data["manifest"]["columns"]]
+                for row in data["result"]["data_array"]:
+                    row_dict = dict(zip(columns, row))
+                    # Score is typically the last element
+                    vs_score = float(row[-1]) if len(row) > len(columns) else 0.0
+                    candidates.append({
+                        "corpus_id": row_dict.get("id", ""),
+                        "question": row_dict.get("question", ""),
+                        "status": row_dict.get("status", ""),
+                        "next_review_date": str(row_dict.get("next_review_date", "")),
+                        "vs_score": vs_score,
+                    })
+            return candidates
 
-            # --- Step 2: Short-circuit low VS scores ---
-            needs_judge = []  # (eval_id, prompt, candidate) tuples that need judge
-            short_circuited = {}  # eval_id → result dict
-            
-            for _, row in pdf.iterrows():
-                eval_id = row["id"]
-                prompt = row["prompt"]
-                candidates, top_score, vs_latency = vs_results_map[eval_id]
-                
-                if not candidates:
-                    # No VS results → analytical
-                    short_circuited[eval_id] = {
-                        "lane": "analytical", "confidence": 0.0,
-                        "corpus_id": None, "top_candidate_question": None,
-                        "vs_score": 0.0, "short_circuit": True,
-                        "latency_ms": int(vs_latency * 1000),
-                    }
-                elif top_score < vs_short_circuit_threshold:
-                    # VS score too low → skip judge, route to analytical
-                    short_circuited[eval_id] = {
-                        "lane": "analytical", "confidence": 0.0,
-                        "corpus_id": candidates[0]["corpus_id"],
-                        "top_candidate_question": candidates[0]["question"],
-                        "vs_score": top_score, "short_circuit": True,
-                        "latency_ms": int(vs_latency * 1000),
-                    }
-                else:
-                    # Needs judge evaluation
-                    needs_judge.append((eval_id, prompt, candidates[0], vs_latency))
-
-            # --- Step 3: Batch judge calls ---
-            judge_results = {}  # eval_id → (verdict, latency)
-            
-            # Process in batches of judge_batch_size
-            for batch_start in range(0, len(needs_judge), judge_batch_size):
-                batch = needs_judge[batch_start:batch_start + judge_batch_size]
-                batch_start_time = time.time()
-                
-                if len(batch) == 1:
-                    # Single item — use standard single judge call
-                    eval_id, prompt, candidate, vs_latency = batch[0]
-                    verdict = _single_judge(w_exec, judge_model, prompt, candidate["question"])
-                    batch_latency = time.time() - batch_start_time
-                    judge_results[eval_id] = (verdict, vs_latency + batch_latency)
-                else:
-                    # Multi-item batch — single LLM call with multiple pairs
-                    verdicts = _batch_judge(w_exec, judge_model, batch)
-                    batch_latency = time.time() - batch_start_time
-                    per_item_latency = batch_latency / len(batch)
-                    for i, (eval_id, prompt, candidate, vs_latency) in enumerate(batch):
-                        judge_results[eval_id] = (verdicts[i], vs_latency + per_item_latency)
-
-            # --- Step 4: Assemble final results ---
-            for _, row in pdf.iterrows():
-                eval_id = row["id"]
-                prompt = row["prompt"]
-                
-                if eval_id in short_circuited:
-                    result = short_circuited[eval_id]
-                elif eval_id in judge_results:
-                    verdict, total_latency = judge_results[eval_id]
-                    candidates, top_score, _ = vs_results_map[eval_id]
-                    top_cand = candidates[0]
-                    
-                    confidence = 1.0 if verdict == "MATCH" else 0.0
-                    
-                    # Staleness check
-                    try:
-                        review_date = date.fromisoformat(str(top_cand["next_review_date"])[:10])
-                        if review_date < date.today():
-                            confidence = min(confidence, confidence_threshold - 0.01)
-                    except (ValueError, TypeError):
-                        pass
-                    
-                    # Gate decision
-                    if confidence >= confidence_threshold and top_cand["status"] == "certified":
-                        lane = "certified"
-                    else:
-                        lane = "analytical"
-                    
-                    result = {
-                        "lane": lane, "confidence": confidence,
-                        "corpus_id": top_cand["corpus_id"],
-                        "top_candidate_question": top_cand["question"],
-                        "vs_score": top_score, "short_circuit": False,
-                        "latency_ms": int(total_latency * 1000),
-                    }
-                else:
-                    result = {
-                        "lane": "analytical", "confidence": 0.0,
-                        "corpus_id": None, "top_candidate_question": None,
-                        "vs_score": 0.0, "short_circuit": True,
-                        "latency_ms": 0,
-                    }
-                
-                badge = "HUMAN APPROVED" if result["lane"] == "certified" else "NOT YET APPROVED"
-                results.append({
-                    "eval_id": eval_id,
-                    "prompt": prompt,
-                    "category": row["category"],
-                    "expected_lane": row["expected_lane"],
-                    "expected_corpus_id": row.get("expected_corpus_id"),
-                    "difficulty": row.get("difficulty"),
-                    "predicted_lane": result["lane"],
-                    "predicted_confidence": float(result["confidence"]),
-                    "predicted_corpus_id": result.get("corpus_id"),
-                    "predicted_badge": badge,
-                    "top_candidate_question": result.get("top_candidate_question"),
-                    "vs_score": float(result.get("vs_score", 0.0)),
-                    "latency_ms": int(result.get("latency_ms", 0)),
-                    "short_circuit": bool(result.get("short_circuit", False)),
-                    "is_correct": result["lane"] == row["expected_lane"],
-                    "error": None,
-                })
-            
-            yield pd.DataFrame(results)
-
-    return eval_batch
-
-
-def _single_judge(w_exec, judge_model: str, prompt: str, template: str) -> str:
-    """Single binary judge call via SDK."""
-    from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
-    judge_prompt = f"""You are an intent matching judge. Determine if the user question asks the SAME thing as the certified question template.
+        # --- Helper: Single judge call ---
+        def single_judge(prompt, template):
+            """Binary judge: MATCH or NO_MATCH."""
+            judge_prompt = f"""You are an intent matching judge. Determine if the user question asks the SAME thing as the certified question template.
 
 IMPORTANT: The certified question may contain parameter placeholders in curly braces like {{period}}, {{campaign}}, {{metric}}.
 These placeholders match ANY concrete value.
@@ -325,37 +214,21 @@ User question: "{prompt}"
 Certified template: "{template}"
 
 Answer with ONLY one word: MATCH or NO_MATCH"""
+            try:
+                text = call_llm(judge_prompt, max_tokens=10)
+                upper = text.upper().replace(".", "").replace('"', "")
+                return "MATCH" if "MATCH" in upper and "NO" not in upper else "NO_MATCH"
+            except Exception:
+                return "NO_MATCH"
 
-    try:
-        response = w_exec.serving_endpoints.query(
-            name=judge_model,
-            messages=[ChatMessage(role=ChatMessageRole.USER, content=judge_prompt)],
-            temperature=0.0,
-            max_tokens=10,
-        )
-        text = response.choices[0].message.content.strip().upper().replace(".", "").replace('"', "")
-        return "MATCH" if "MATCH" in text and "NO" not in text else "NO_MATCH"
-    except Exception:
-        return "NO_MATCH"
+        # --- Helper: Batch judge call (multiple pairs per LLM request) ---
+        def batch_judge(batch_items):
+            """Judge multiple prompt-template pairs in one LLM call."""
+            pairs_text = ""
+            for i, (prompt, template) in enumerate(batch_items, 1):
+                pairs_text += f"\nPair {i}:\n  User question: \"{prompt}\"\n  Certified template: \"{template}\"\n"
 
-
-def _batch_judge(w_exec, judge_model: str, batch: List[Tuple]) -> List[str]:
-    """Batch multiple prompt-template pairs into a single LLM call.
-    
-    Sends up to JUDGE_BATCH_SIZE pairs in one request.
-    Returns a list of verdicts (MATCH/NO_MATCH) in order.
-    """
-    from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
-    # Build a batch prompt with numbered pairs
-    pairs_text = ""
-    for i, (eval_id, prompt, candidate, _) in enumerate(batch, 1):
-        pairs_text += f"""
-Pair {i}:
-  User question: "{prompt}"
-  Certified template: "{candidate['question']}"
-"""
-
-    batch_prompt = f"""You are an intent matching judge. For each numbered pair below, determine if the user question asks the SAME thing as the certified template.
+            batch_prompt = f"""You are an intent matching judge. For each numbered pair below, determine if the user question asks the SAME thing as the certified template.
 
 RULES:
 - Templates may contain parameter placeholders in curly braces ({{period}}, {{campaign}}) that match ANY value.
@@ -367,40 +240,150 @@ RULES:
 For each pair, answer with ONLY the pair number and verdict. Format:
 1: MATCH
 2: NO_MATCH
-3: MATCH
 ...
 
 Answer ONLY with the numbered verdicts, nothing else."""
 
-    try:
-        response = w_exec.serving_endpoints.query(
-            name=judge_model,
-            messages=[ChatMessage(role=ChatMessageRole.USER, content=batch_prompt)],
-            temperature=0.0,
-            max_tokens=50,
-        )
-        text = response.choices[0].message.content.strip()
-        
-        # Parse numbered responses
-        verdicts = []
-        for i in range(1, len(batch) + 1):
-            line_found = False
-            for line in text.upper().split("\n"):
-                if line.strip().startswith(f"{i}:") or line.strip().startswith(f"{i}."):
-                    if "NO" in line:
+            try:
+                text = call_llm(batch_prompt, max_tokens=50)
+                verdicts = []
+                for i in range(1, len(batch_items) + 1):
+                    found = False
+                    for line in text.upper().split("\n"):
+                        if line.strip().startswith(f"{i}:") or line.strip().startswith(f"{i}."):
+                            if "NO" in line:
+                                verdicts.append("NO_MATCH")
+                            elif "MATCH" in line:
+                                verdicts.append("MATCH")
+                            else:
+                                verdicts.append("NO_MATCH")
+                            found = True
+                            break
+                    if not found:
                         verdicts.append("NO_MATCH")
-                    elif "MATCH" in line:
-                        verdicts.append("MATCH")
-                    else:
-                        verdicts.append("NO_MATCH")
-                    line_found = True
-                    break
-            if not line_found:
-                verdicts.append("NO_MATCH")  # Fail safe
-        
-        return verdicts
-    except Exception:
-        return ["NO_MATCH"] * len(batch)
+                return verdicts
+            except Exception:
+                return ["NO_MATCH"] * len(batch_items)
+
+        # === Main processing loop for each partition ===
+        for pdf in pdf_iterator:
+            results = []
+
+            # Step 1: Retrieve VS candidates for all rows
+            vs_results_map = {}
+            for _, row in pdf.iterrows():
+                eval_id = row["id"]
+                prompt = row["prompt"]
+                start_t = time.time()
+                try:
+                    candidates = query_vs(prompt)
+                    top_score = candidates[0]["vs_score"] if candidates else 0.0
+                    vs_results_map[eval_id] = (candidates, top_score, time.time() - start_t)
+                except Exception:
+                    vs_results_map[eval_id] = ([], 0.0, time.time() - start_t)
+
+            # Step 2: Short-circuit low VS scores
+            needs_judge = []
+            short_circuited = {}
+
+            for _, row in pdf.iterrows():
+                eval_id = row["id"]
+                candidates, top_score, vs_latency = vs_results_map[eval_id]
+
+                if not candidates:
+                    short_circuited[eval_id] = {
+                        "lane": "analytical", "confidence": 0.0,
+                        "corpus_id": None, "top_candidate_question": None,
+                        "vs_score": 0.0, "short_circuit": True,
+                        "latency_ms": int(vs_latency * 1000),
+                    }
+                elif top_score < vs_short_circuit_threshold:
+                    short_circuited[eval_id] = {
+                        "lane": "analytical", "confidence": 0.0,
+                        "corpus_id": candidates[0]["corpus_id"],
+                        "top_candidate_question": candidates[0]["question"],
+                        "vs_score": top_score, "short_circuit": True,
+                        "latency_ms": int(vs_latency * 1000),
+                    }
+                else:
+                    needs_judge.append((eval_id, row["prompt"], candidates[0], vs_latency))
+
+            # Step 3: Batch judge calls
+            judge_results = {}
+            for batch_start in range(0, len(needs_judge), judge_batch_size):
+                batch = needs_judge[batch_start:batch_start + judge_batch_size]
+                batch_start_time = time.time()
+
+                if len(batch) == 1:
+                    eval_id, prompt, cand, vs_lat = batch[0]
+                    verdict = single_judge(prompt, cand["question"])
+                    judge_results[eval_id] = (verdict, vs_lat + (time.time() - batch_start_time))
+                else:
+                    pairs = [(item[1], item[2]["question"]) for item in batch]
+                    verdicts = batch_judge(pairs)
+                    batch_lat = (time.time() - batch_start_time) / len(batch)
+                    for i, (eval_id, prompt, cand, vs_lat) in enumerate(batch):
+                        judge_results[eval_id] = (verdicts[i], vs_lat + batch_lat)
+
+            # Step 4: Assemble results
+            for _, row in pdf.iterrows():
+                eval_id = row["id"]
+
+                if eval_id in short_circuited:
+                    result = short_circuited[eval_id]
+                elif eval_id in judge_results:
+                    verdict, total_lat = judge_results[eval_id]
+                    candidates, top_score, _ = vs_results_map[eval_id]
+                    top_cand = candidates[0]
+
+                    confidence = 1.0 if verdict == "MATCH" else 0.0
+
+                    # Staleness check
+                    try:
+                        rd = date.fromisoformat(str(top_cand["next_review_date"])[:10])
+                        if rd < date.today():
+                            confidence = min(confidence, confidence_threshold - 0.01)
+                    except (ValueError, TypeError):
+                        pass
+
+                    lane = "certified" if confidence >= confidence_threshold and top_cand["status"] == "certified" else "analytical"
+                    result = {
+                        "lane": lane, "confidence": confidence,
+                        "corpus_id": top_cand["corpus_id"],
+                        "top_candidate_question": top_cand["question"],
+                        "vs_score": top_score, "short_circuit": False,
+                        "latency_ms": int(total_lat * 1000),
+                    }
+                else:
+                    result = {
+                        "lane": "analytical", "confidence": 0.0,
+                        "corpus_id": None, "top_candidate_question": None,
+                        "vs_score": 0.0, "short_circuit": True, "latency_ms": 0,
+                    }
+
+                badge = "HUMAN APPROVED" if result["lane"] == "certified" else "NOT YET APPROVED"
+                results.append({
+                    "eval_id": eval_id,
+                    "prompt": row["prompt"],
+                    "category": row["category"],
+                    "expected_lane": row["expected_lane"],
+                    "expected_corpus_id": row.get("expected_corpus_id"),
+                    "difficulty": row.get("difficulty"),
+                    "predicted_lane": result["lane"],
+                    "predicted_confidence": float(result["confidence"]),
+                    "predicted_corpus_id": result.get("corpus_id"),
+                    "predicted_badge": badge,
+                    "top_candidate_question": result.get("top_candidate_question"),
+                    "vs_score": float(result.get("vs_score", 0.0)),
+                    "latency_ms": int(result.get("latency_ms", 0)),
+                    "short_circuit": bool(result.get("short_circuit", False)),
+                    "is_correct": result["lane"] == row["expected_lane"],
+                    "error": None,
+                })
+
+            yield pd.DataFrame(results)
+
+    return eval_batch
 
 # COMMAND ----------
 
@@ -409,41 +392,44 @@ Answer ONLY with the numbered verdicts, nothing else."""
 
 # COMMAND ----------
 
-from databricks.sdk import WorkspaceClient as _WC
-from databricks.sdk.config import Config as _Config
-from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
+import requests as _req
 
-# Quick validation on driver
-_w = _WC(config=_Config(host=_driver_host, token=_driver_token))
-print("Validating LLM and VS connectivity...")
-_test_vs = _w.vector_search_indexes.query_index(
-    index_name=VS_INDEX,
-    columns=["id", "question", "status", "next_review_date"],
-    query_text="What is the total ad spend for Q1 2025?",
-    num_results=1,
-)
-assert _test_vs.result.data_array, "VS returned no results"
-print(f"  VS: OK (returned {len(_test_vs.result.data_array)} candidates)")
+# Quick validation on driver using raw HTTP (same as executors will use)
+print("Validating LLM and VS connectivity (raw HTTP)...")
 
-_test_judge = _single_judge(_w, JUDGE_MODEL, "What is the total ad spend for Q1 2025?", "What is the total ad spend for {period}?")
-assert _test_judge == "MATCH", f"Judge returned {_test_judge} for exact match"
-print(f"  Judge: OK (verdict={_test_judge})")
-print("  Connectivity validated.")
+_judge_url = f"{_driver_host}/serving-endpoints/{JUDGE_MODEL}/invocations"
+_headers = {"Authorization": f"Bearer {_driver_token}", "Content-Type": "application/json"}
+
+_test_resp = _req.post(_judge_url, headers=_headers, json={
+    "messages": [{"role": "user", "content": "Answer MATCH or NO_MATCH: Does \"What is the total ad spend for Q1 2025?\" match template \"What is the total ad spend for {period}?\"?"}],
+    "temperature": 0.0, "max_tokens": 10,
+}, timeout=30)
+_test_resp.raise_for_status()
+_judge_result = _test_resp.json()["choices"][0]["message"]["content"].strip()
+print(f"  Judge test: '{_judge_result}'")
+assert "MATCH" in _judge_result.upper() and "NO" not in _judge_result.upper(), f"Judge returned {_judge_result} for exact match"
+
+_vs_url = f"{_driver_host}/api/2.0/vector-search/indexes/{VS_INDEX}/query"
+_vs_resp = _req.post(_vs_url, headers=_headers, json={
+    "columns": ["id", "question", "status", "next_review_date"],
+    "query_text": "What is the total ad spend for Q1 2025?",
+    "num_results": 1,
+}, timeout=30)
+_vs_resp.raise_for_status()
+_vs_data = _vs_resp.json()
+assert _vs_data.get("result", {}).get("data_array"), "VS returned no results"
+print(f"  VS: OK (returned {len(_vs_data['result']['data_array'])} candidates)")
+print("  Connectivity validated (raw HTTP).")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Run Router Evaluation (Distributed)
 # MAGIC 
-# MAGIC Uses `mapInPandas` to distribute eval rows across Spark executors.
-# MAGIC Each executor processes a partition with:
-# MAGIC - VS retrieval per row
-# MAGIC - Short-circuit for low VS scores (< 0.4)
-# MAGIC - Batch judge calls (5 pairs per LLM request)
+# MAGIC Uses `mapInPandas` with all logic inside the closure.
+# MAGIC Raw HTTP requests on executors (no SDK dependency).
 
 # COMMAND ----------
-
-import traceback
 
 print(f"Running optimized eval on {eval_count} rows...")
 print(f"  Parallelism: {NUM_PARTITIONS} Spark partitions")
@@ -473,7 +459,7 @@ output_schema = StructType([
     StructField("error", StringType()),
 ])
 
-# Create the eval function with captured config
+# Create eval function — all helpers are inside the closure
 eval_fn = _create_eval_function(
     driver_token=_driver_token,
     driver_host=_driver_host,
@@ -492,9 +478,9 @@ results_df = (
     .mapInPandas(eval_fn, schema=output_schema)
 )
 
-# Materialize results (triggers execution)
-results_df.write.mode('overwrite').saveAsTable(f'{CATALOG}.{SCHEMA}._eval_temp')
-results_df = spark.table(f'{CATALOG}.{SCHEMA}._eval_temp')
+# Materialize via temp Delta table (cache() not supported on serverless)
+results_df.write.mode("overwrite").saveAsTable(f"{CATALOG}.{SCHEMA}._eval_temp")
+results_df = spark.table(f"{CATALOG}.{SCHEMA}._eval_temp")
 result_count = results_df.count()
 
 elapsed = time.time() - start_time
