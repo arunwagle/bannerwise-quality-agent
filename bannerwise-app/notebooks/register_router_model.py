@@ -317,6 +317,13 @@ with mlflow.start_run(run_name="register_router_model") as run:
 
 # COMMAND ----------
 
+# Set DATABRICKS_TOKEN env var so the model can authenticate during validation
+# (In Model Serving this is auto-injected; in notebooks we set it manually)
+import os
+_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
+os.environ["DATABRICKS_TOKEN"] = _token
+os.environ["DATABRICKS_HOST"] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().get()
+
 # Quick validation
 loaded = mlflow.pyfunc.load_model(model_info.model_uri)
 test_input = pd.DataFrame({"prompt": ["What is the total ad spend for Q1 2025?"]})
