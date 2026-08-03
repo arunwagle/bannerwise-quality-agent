@@ -20,17 +20,28 @@ bannerwise-quality-agent/
     │   └── bannerwise_quality_agent.app.yml   — App resource (disabled, managed outside bundle)
     │
     ├── notebooks/
-    │   ├── create_tables.py              — DDL for corpus, history, review queue
-    │   ├── create_synthetic_data.py      — Analytics tables (ad_metrics, campaign_metrics, etc.)
-    │   ├── create_vector_search_index.py — Creates Delta Sync VS index on certified_qa_corpus
-    │   ├── grant_permissions.py          — Grants SP access to warehouse, endpoints, UC
-    │   ├── router_agent.py               — Router agent definition (MLflow Pyfunc)
-    │   ├── register_router_model.py      — Register router model to UC
-    │   ├── deploy_serving_endpoint.py    — Deploy model to serving endpoint
-    │   ├── configure_ai_gateway.py       — AI Gateway config (inference tables, rate limits)
-    │   ├── generate_eval_dataset.py      — LLM-generated eval dataset from corpus
-    │   ├── run_router_eval_v2.py         — Router evaluation (mapInPandas + batch judge)
-    │   └── check_eval_thresholds.py      — Quality gate assertions (precision/recall)
+    │   ├── data/
+    │   │   ├── create_tables.py              — DDL for corpus, history, review queue
+    │   │   └── create_synthetic_data.py      — Analytics tables (ad_metrics, campaign_metrics, etc.)
+    │   ├── vs/
+    │   │   ├── create_vector_search_index.py — Creates Delta Sync VS index on certified_qa_corpus
+    │   │   └── cleanup_vector_index.py       — Removes VS index (cleanup job)
+    │   ├── agent/
+    │   │   ├── router_agent.py               — Router agent definition (MLflow Pyfunc)
+    │   │   ├── register_router_model.py      — Register router model to UC
+    │   │   ├── deploy_serving_endpoint.py    — Deploy model to serving endpoint
+    │   │   ├── configure_ai_gateway.py       — AI Gateway config (inference tables, rate limits)
+    │   │   ├── promote_to_champion.py        — Promote model version to champion alias
+    │   │   ├── cleanup_serving_endpoint.py   — Removes serving endpoint (cleanup job)
+    │   │   └── cleanup_registered_model.py   — Removes UC model (cleanup job)
+    │   ├── eval/
+    │   │   ├── generate_eval_dataset.py      — LLM-generated eval dataset from corpus
+    │   │   ├── run_router_eval_v2.py         — Router evaluation (mapInPandas + batch judge)
+    │   │   └── check_eval_thresholds.py      — Quality gate assertions (precision/recall)
+    │   └── access/
+    │       ├── setup_uc_access.py            — Grants USE CATALOG/SCHEMA, SELECT, warehouse CAN_USE
+    │       ├── setup_vs_access.py            — Grants CAN_USE on VS endpoint
+    │       └── setup_endpoint_access.py      — Grants CAN_QUERY on serving endpoints
     │
     ├── tests/notebooks/
     │   └── setup_test_data.py            — Populates certified QA corpus with synthetic data
@@ -63,10 +74,12 @@ bannerwise-quality-agent/
 
 | Job | Purpose | Tasks |
 | --- | --- | --- |
-| **setup_job** | Infrastructure setup | `grant_app_permissions` → `create_schema_and_tables` → `create_analytics_tables` |
+| **setup_job** | DDL + seed analytics data | `create_schema_and_tables` → `create_analytics_tables` |
+| **setup_access_job** | App SP connectivity | `configure_uc_access` · `configure_vs_access` · `configure_endpoint_access` (parallel) |
 | **vector_index_job** | Corpus + VS index | `setup_certified_corpus` → `create_vector_search_index` |
 | **router_agent_job** | Full deploy pipeline | `run_router_agent` → `run_eval` → `register_model` → `deploy_serving_endpoint` → `configure_ai_gateway` |
 | **eval_job** | Pre-deploy quality gate | `generate_eval_dataset` → `run_router_eval` → `check_eval_thresholds` |
+| **cleanup_job** | Resource teardown | `cleanup_vector_index` · `cleanup_serving_endpoint` → `cleanup_registered_model` |
 
 ### AI Resources (defined in `bannerwise_quality_agent.ai.yml`)
 
@@ -89,35 +102,45 @@ For a clean deployment from scratch:
 
 ```
 1. bundle deploy --target dev
-   └── Creates: VS endpoint, 4 jobs
+   └── Creates: VS endpoint, 6 jobs, app (dev-bw-quality-agent)
 
 2. Run setup_job
-   └── Creates: schema, tables, analytics data, grants SP permissions
+   └── Creates: schema, DDL tables, analytics data
 
-3. Run vector_index_job
+3. Run setup_access_job
+   └── Grants app SP access to UC, VS endpoint, serving endpoints, warehouse
+
+4. Run vector_index_job
    └── Populates corpus → creates VS index (depends on tables from step 2)
 
-4. Run router_agent_job
+5. Run router_agent_job
    └── Smoke test → eval → register model → deploy endpoint → AI gateway
 
-5. Deploy app (via SDK or bundle if bound)
-   └── App connects to serving endpoint and SQL warehouse
+6. (Optional) Run cleanup_job
+   └── Removes VS index, serving endpoint, and registered model
 ```
 
 ---
 
-## Key Configuration
+## Key Configuration (Bundle Variables — `databricks.yml`)
 
-| Parameter | Value | Used By |
+| Variable | Default | Used By |
 | --- | --- | --- |
 | `catalog_name` | `aw_serverless_stable_catalog` | All jobs |
 | `schema_name` | `bannerhealth` | All jobs |
-| `vs_endpoint` | `bannerwise-vs-endpoint` | Router, eval |
-| `sql_warehouse_id` | `2d8e531640ffa469` | Eval, app |
-| `judge_model` | `databricks-meta-llama-3-3-70b-instruct` | Router, eval |
+| `sql_warehouse_id` | `2d8e531640ffa469` | Access, eval, router |
+| `judge_model` | `databricks-meta-llama-3-3-70b-instruct` | Router, eval, access |
+| `serving_endpoint_name` | `bannerwise-quality-router` | Router, access, cleanup |
+| `model_name` | `bannerwise_quality_router` | Router, cleanup |
+| `app_sp_name` | (per-target override) | Access, router |
 | `confidence_threshold` | `0.5` | Router, eval |
-| `serving_endpoint` | `bannerwise-quality-router` | App, router job |
-| `embedding_model` | `databricks-bge-large-en` | VS index |
+| `shrink_factor` | `1.0` | Router, eval |
+
+**Resource references:**
+| Reference | Resolves To | Used By |
+| --- | --- | --- |
+| `${resources.vector_search_endpoints.bannerwise_vs_endpoint.id}` | `bannerwise-vs-endpoint` | Access, router, eval, cleanup |
+| `${resources.jobs.eval_job.id}` | (deployed job ID) | Router (run_job_task) |
 
 ---
 
