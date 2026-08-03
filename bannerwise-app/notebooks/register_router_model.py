@@ -68,15 +68,18 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
 
     def predict(self, context, model_input: pd.DataFrame) -> pd.DataFrame:
         """Route each prompt to certified or analytical lane."""
+        import os
         from databricks.sdk import WorkspaceClient
         from openai import OpenAI
         from datetime import date
         import json
 
         w = WorkspaceClient()
-        # Get token for LLM calls
-        token = w.config.authenticate()
-        host = f"https://{w.config.host}"
+        # In Model Serving, DATABRICKS_TOKEN is injected automatically
+        token = os.environ.get("DATABRICKS_TOKEN") or w.config.token
+        host = os.environ.get("DATABRICKS_HOST", f"https://{w.config.host}")
+        if not host.startswith("http"):
+            host = f"https://{host}"
         client = OpenAI(api_key=token, base_url=f"{host}/serving-endpoints")
 
         results = []
@@ -98,15 +101,15 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
         return pd.DataFrame(results)
 
     def _route_prompt(self, w, client, prompt):
-        """Core routing logic: retrieve → judge → gate."""
+        """Core routing logic: retrieve top-3 → judge each → gate."""
         from datetime import date
 
-        # Step 1: Retrieve from Vector Search
+        # Step 1: Retrieve top-3 from Vector Search
         vs_results = w.vector_search_indexes.query_index(
             index_name=self.vs_index_name,
             columns=["id", "question", "status", "next_review_date"],
             query_text=prompt,
-            num_results=1,
+            num_results=3,
         )
 
         if not vs_results or not vs_results.result or not vs_results.result.data_array:
@@ -120,9 +123,47 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
             }
 
         columns = [col.name for col in vs_results.manifest.columns]
-        row = dict(zip(columns, vs_results.result.data_array[0]))
 
-        # Step 2: Binary Judge
+        # Evaluate each candidate — first MATCH wins
+        best_result = None
+        for candidate_row in vs_results.result.data_array:
+            row = dict(zip(columns, candidate_row))
+            confidence = self._judge_candidate(client, prompt, row)
+
+            # Staleness check
+            try:
+                review_date = date.fromisoformat(str(row.get("next_review_date", "2099-01-01")))
+                if review_date < date.today():
+                    confidence = min(confidence, self.confidence_threshold - 0.01)
+            except (ValueError, TypeError):
+                pass
+
+            # Gate decision
+            if confidence >= self.confidence_threshold and row.get("status") == "certified":
+                return {
+                    "lane": "certified",
+                    "badge": "HUMAN APPROVED",
+                    "confidence": confidence,
+                    "corpus_id": row["id"],
+                    "matched_question": row["question"],
+                    "error": None,
+                }
+
+            # Track first candidate as fallback
+            if best_result is None:
+                best_result = {
+                    "lane": "analytical",
+                    "badge": "NOT YET APPROVED",
+                    "confidence": confidence,
+                    "corpus_id": row["id"],
+                    "matched_question": row["question"],
+                    "error": None,
+                }
+
+        return best_result
+
+    def _judge_candidate(self, client, prompt, row):
+        """Binary judge: asks LLM if intent matches. Returns 1.0 or 0.0."""
         judge_prompt = f"""You are an intent matching judge. Determine if the user question asks the SAME thing as the certified question template.
 
 IMPORTANT: The certified question may contain parameter placeholders in curly braces like {{period}}, {{campaign}}, {{metric}}.
@@ -152,35 +193,13 @@ Answer with ONLY one word: MATCH or NO_MATCH"""
             )
             llm_response = response.choices[0].message.content.strip()
         except Exception:
-            llm_response = "NO_MATCH"
+            return 0.0  # Fail safe
 
-        response_upper = llm_response.upper().replace(".", "").replace('"', '')
-        confidence = 1.0 if ("MATCH" in response_upper and "NO" not in response_upper) else 0.0
-
-        # Step 3: Staleness Check
-        try:
-            review_date = date.fromisoformat(str(row.get("next_review_date", "2099-01-01")))
-            if review_date < date.today():
-                confidence = min(confidence, self.confidence_threshold - 0.01)
-        except (ValueError, TypeError):
-            pass
-
-        # Step 4: Gate Decision
-        if confidence >= self.confidence_threshold and row.get("status") == "certified":
-            lane = "certified"
-            badge = "HUMAN APPROVED"
+        response_upper = llm_response.upper().replace(".", "").replace('"', "")
+        if "MATCH" in response_upper and "NO" not in response_upper:
+            return 1.0
         else:
-            lane = "analytical"
-            badge = "NOT YET APPROVED"
-
-        return {
-            "lane": lane,
-            "badge": badge,
-            "confidence": confidence,
-            "corpus_id": row["id"],
-            "matched_question": row["question"],
-            "error": None,
-        }
+            return 0.0
 
 # COMMAND ----------
 
