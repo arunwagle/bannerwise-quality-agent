@@ -101,3 +101,92 @@ The router agent orchestrates the decision flow:
 | Auditability | Complete provenance chain for certified answers |
 | Staleness governance | Expired corpus entries never serve as certified |
 | Fallback | Genie Space analytical lane with review suggestion |
+
+
+---
+
+## Phase 2 — Performance & Operational Improvements
+
+### 1. Eval Job Performance Optimization
+
+**Problem**: The eval job (`run_router_eval`) processes ~180 rows sequentially, each requiring 1 VS call + up to 3 LLM judge calls. Total: ~720 API calls at ~1-2s each = 12-20 minutes. Target: ≤ 2 minutes.
+
+**Root Cause**: All API calls (Vector Search + LLM judge) are I/O-bound but executed serially in a `for` loop.
+
+#### Recommended Optimizations (ordered by impact)
+
+| # | Optimization | Expected Speedup | Complexity |
+| --- | --- | --- | --- |
+| 1 | **ThreadPoolExecutor (20 workers)** | 10-15x | Low |
+| 2 | **Short-circuit low VS scores** (< 0.4 → skip judge) | 30-40% fewer LLM calls | Low |
+| 3 | **Top-1 candidate only** in eval (not top-3) | 3x fewer judge calls | Low |
+| 4 | **Spark mapInPandas** for cluster-level parallelism | Scales beyond single driver | Medium |
+| 5 | **Batch judge calls** (multiple prompts per LLM request) | Reduces HTTP overhead | Medium |
+
+#### Implementation Plan
+
+**Optimization #1: ThreadPoolExecutor** (highest priority)
+- Replace serial `for row in eval_df` loop with concurrent execution
+- Use `concurrent.futures.ThreadPoolExecutor(max_workers=20)`
+- LLM + VS calls are I/O-bound → threading is safe and effective
+- Expected result: 180 rows in ~1-2 min instead of 15
+
+**Optimization #2: Short-circuit low VS scores**
+- If Vector Search similarity score < 0.4, skip the judge LLM call entirely
+- Assign confidence = 0.0, route to analytical immediately
+- Saves ~40-50% of LLM calls (adversarial, near-miss prompts score low in VS)
+
+**Optimization #3: Top-1 candidate in eval**
+- Currently fetches top-3 VS results and judges each candidate
+- For eval purposes, top-1 is sufficient (VS already ranks by relevance)
+- Reduces judge calls from ~540 to ~180
+
+#### Projected Timeline
+
+| After Optimization | Estimated Duration |
+| --- | --- |
+| Baseline (current) | ~15 min |
+| + ThreadPool (20 workers) | ~1.5 min |
+| + Short-circuit low VS | ~1 min |
+| + Top-1 only | ~45s |
+
+### 2. Champion/Challenger Model Governance
+
+**Implemented**: New model versions are registered as `champion` only after passing the eval quality gate. The serving endpoint always deploys the `@champion` alias.
+
+**Future enhancements**:
+- Shadow traffic routing: send a % of production traffic to `@challenger` for A/B testing
+- Automated rollback: if champion's live precision drops below threshold, revert to `@archived_champion`
+- Model lineage tracking: tag each version with the eval run_id and metrics that promoted it
+
+### 3. AI Gateway Observability
+
+**Implemented**: Inference tables, usage tracking, and rate limits configured via AI Gateway.
+
+**Future enhancements**:
+- Alerting on rate limit breaches
+- Dashboard for inference latency P50/P95/P99
+- Cost attribution per user/team
+- Guardrails: input/output safety filtering for PII detection
+
+### 4. App Integration Hardening
+
+**Implemented**: Live endpoint integration with WorkspaceClient SDK auth.
+
+**Future enhancements**:
+- Circuit breaker pattern: fall back to mock/cached responses if endpoint is down
+- Client-side retry with exponential backoff
+- Response caching for repeated identical prompts (TTL-based)
+- Graceful degradation UI when endpoint is warming up (scale-to-zero)
+
+### 5. Eval Dataset Quality
+
+**Known issues** (from Phase 1):
+- 3 `stale_entry_test` prompts match certified entries (design flaw — disabled staleness gate)
+- Some paraphrases too close to templates (false negatives on creative rewrites)
+
+**Phase 2 improvements**:
+- Redesign stale_entry_test with unique prompts that ONLY match expired entries
+- Add adversarial categories: prompt injection via Unicode, homoglyph attacks, multi-language
+- Increase dataset diversity: more colloquial rewrites, domain-specific jargon
+- Add regression test suite: pin specific prompts that previously failed
