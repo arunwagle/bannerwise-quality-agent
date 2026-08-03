@@ -182,7 +182,7 @@ def _create_eval_function(driver_token, driver_host, vs_index, vs_top_k, judge_m
                 for row in data["result"]["data_array"]:
                     row_dict = dict(zip(columns, row))
                     # Score is typically the last element
-                    vs_score = float(row[-1]) if len(row) > len(columns) else 0.0
+                    vs_score = float(row_dict.get("score", row[-1]))
                     candidates.append({
                         "corpus_id": row_dict.get("id", ""),
                         "question": row_dict.get("question", ""),
