@@ -39,18 +39,19 @@ resources:
         enabled: true
 
     # ─────────────────────────────────────────────────────────────
-    # Router Agent Job — Invokes the supervisor agent for a prompt
+    # Router Agent Job — Full deployment pipeline
+    # smoke test → eval gate → register champion → deploy → AI Gateway
     # ─────────────────────────────────────────────────────────────
     router_agent_job:
       name: 'bannerwise-quality-agent-router'
-      description: 'Invokes the Bannerwise Quality Router supervisor agent to assess a user prompt'
+      description: 'Deploy pipeline: smoke test → eval gate → register champion → deploy serving → configure AI Gateway'
       tags:
         project: bannerwise-quality-agent
-        purpose: router-agent
+        purpose: router-deploy-pipeline
 
       parameters:
         - name: prompt
-          default: ''
+          default: 'What is the total ad spend for Q1 2025?'
         - name: catalog_name
           default: aw_serverless_stable_catalog
         - name: schema_name
@@ -117,7 +118,7 @@ resources:
               confidence_threshold: '{{job.parameters.confidence_threshold}}'
 
         - task_key: register_model
-          description: 'Register router as MLflow model (champion) — only runs after eval passes'
+          description: 'Register router as MLflow model (champion) — only after eval passes'
           depends_on:
             - task_key: run_eval
           notebook_task:
