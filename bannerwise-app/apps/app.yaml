@@ -16,3 +16,7 @@ env:
     value: 'production'
   - name: 'SECRET_KEY'
     valueFrom: 'secret/bannerwise-quality-agent/flask-secret-key'
+  - name: 'API_MODE'
+    value: 'live'
+  - name: 'SERVING_ENDPOINT_NAME'
+    value: 'bannerwise-quality-router'
