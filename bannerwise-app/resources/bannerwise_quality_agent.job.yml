@@ -33,22 +33,50 @@ resources:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
 
-        - task_key: populate_corpus_and_history
-          description: 'Populate certified QA corpus, query history, and SME review queue with synthetic data'
+        - task_key: create_analytics_tables
+          description: 'Create analytics tables (ad_metrics, campaign_metrics, etc.) used by certified SQL templates'
           depends_on:
             - task_key: create_schema_and_tables
+          notebook_task:
+            notebook_path: ../notebooks/create_synthetic_data.py
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+
+      queue:
+        enabled: true
+
+    # ─────────────────────────────────────────────────────────────
+    # Vector Index Job — Populates corpus and creates VS index
+    # ─────────────────────────────────────────────────────────────
+    vector_index_job:
+      name: 'bannerwise-quality-agent-vector-index'
+      description: 'Populates certified QA corpus and creates the Delta Sync Vector Search index'
+      tags:
+        project: bannerwise-quality-agent
+        purpose: vector-index-setup
+
+      parameters:
+        - name: catalog_name
+          default: aw_serverless_stable_catalog
+        - name: schema_name
+          default: bannerhealth
+
+      tasks:
+        - task_key: setup_certified_corpus
+          description: 'Populate certified QA corpus table with approved Q&A entries'
           notebook_task:
             notebook_path: ../tests/notebooks/setup_test_data.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
 
-        - task_key: create_analytics_tables
-          description: 'Create analytics tables (ad_metrics, campaign_metrics, etc.) used by certified SQL templates'
+        - task_key: create_vector_search_index
+          description: 'Create Delta Sync VS index on certified_qa_corpus'
           depends_on:
-            - task_key: create_schema_and_tables
+            - task_key: setup_certified_corpus
           notebook_task:
-            notebook_path: ../tests/notebooks/create_synthetic_data.py
+            notebook_path: ../notebooks/create_vector_search_index.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -229,7 +257,7 @@ resources:
         - task_key: generate_eval_dataset
           description: 'LLM-powered eval dataset generation from certified corpus'
           notebook_task:
-            notebook_path: ../tests/notebooks/generate_eval_dataset.py
+            notebook_path: ../notebooks/generate_eval_dataset.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -245,7 +273,7 @@ resources:
           depends_on:
             - task_key: generate_eval_dataset
           notebook_task:
-            notebook_path: ../tests/notebooks/run_router_eval_v2.py
+            notebook_path: ../notebooks/run_router_eval_v2.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -260,7 +288,7 @@ resources:
           depends_on:
             - task_key: run_router_eval
           notebook_task:
-            notebook_path: ../tests/notebooks/check_eval_thresholds.py
+            notebook_path: ../notebooks/check_eval_thresholds.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
