@@ -181,12 +181,15 @@ The router agent orchestrates the decision flow:
 
 ### 5. Eval Dataset Quality
 
-**Known issues** (from Phase 1):
-- 3 `stale_entry_test` prompts match certified entries (design flaw — disabled staleness gate)
-- Some paraphrases too close to templates (false negatives on creative rewrites)
+**Resolved** (stale_entry_test redesign):
+- **Root cause**: Original 180 stale_entry_test prompts used generic phrasing (e.g., "bounce rate", "CTR") that matched non-stale certified entries (QA-0012, QA-0003) instead of the intended expired entries (QA-0018/0019/0020). VS returned the certified entry as a higher-scoring match → staleness check never fired → false positives.
+- **Fix**: Replaced with 15 VS-verified prompts (5 per expired entry) using unique keywords:
+  - QA-0018: "viewability" — term absent from all certified entries
+  - QA-0019: "6-month CTR trend" — unique temporal scope (QA-0003 is "CTR by banner size")
+  - QA-0020: "CPM by publisher" — unique dimension (QA-0005 is "CPM by region")
+- **Validation**: All 15 prompts confirmed via VS query to return the expected expired entry as top match (scores 0.66–1.0).
 
-**Phase 2 improvements**:
-- Redesign stale_entry_test with unique prompts that ONLY match expired entries
+**Remaining improvements** (Phase 2):
 - Add adversarial categories: prompt injection via Unicode, homoglyph attacks, multi-language
 - Increase dataset diversity: more colloquial rewrites, domain-specific jargon
 - Add regression test suite: pin specific prompts that previously failed
