@@ -119,6 +119,11 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
                 "confidence": 0.0,
                 "corpus_id": None,
                 "matched_question": None,
+                "vs_score": 0.0,
+                "judge_verdict": "NO_CANDIDATES",
+                "reason": "No candidates found in vector search",
+                "threshold_used": self.confidence_threshold,
+                "candidates_evaluated": 0,
                 "error": None,
             }
 
@@ -126,14 +131,20 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
 
         # Evaluate each candidate — first MATCH wins
         best_result = None
+        candidates_evaluated = 0
         for candidate_row in vs_results.result.data_array:
             row = dict(zip(columns, candidate_row))
-            confidence = self._judge_candidate(client, prompt, row)
+            candidates_evaluated += 1
+            vs_score = float(candidate_row[-1]) if len(candidate_row) > len(columns) - 1 else 0.0
+            judge_verdict = self._judge_candidate(client, prompt, row)
+            confidence = 1.0 if judge_verdict == "MATCH" else 0.0
 
             # Staleness check
+            is_stale = False
             try:
                 review_date = date.fromisoformat(str(row.get("next_review_date", "2099-01-01")))
                 if review_date < date.today():
+                    is_stale = True
                     confidence = min(confidence, self.confidence_threshold - 0.01)
             except (ValueError, TypeError):
                 pass
@@ -146,20 +157,40 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
                     "confidence": confidence,
                     "corpus_id": row["id"],
                     "matched_question": row["question"],
+                    "vs_score": round(vs_score, 4),
+                    "judge_verdict": "MATCH",
+                    "reason": "Intent matched certified template",
+                    "threshold_used": self.confidence_threshold,
+                    "candidates_evaluated": candidates_evaluated,
                     "error": None,
                 }
 
-            # Track first candidate as fallback
+            # Track first candidate as fallback with detailed reason
             if best_result is None:
+                if is_stale:
+                    reason = f"Entry is stale (review_date={row.get('next_review_date')})"
+                elif judge_verdict == "NO_MATCH":
+                    reason = f"Judge verdict: NO_MATCH (intent differs from template)"
+                elif row.get("status") != "certified":
+                    reason = f"Entry status is '{row.get('status')}' (not certified)"
+                else:
+                    reason = "Below confidence threshold"
+
                 best_result = {
                     "lane": "analytical",
                     "badge": "NOT YET APPROVED",
                     "confidence": confidence,
                     "corpus_id": row["id"],
                     "matched_question": row["question"],
+                    "vs_score": round(vs_score, 4),
+                    "judge_verdict": judge_verdict,
+                    "reason": reason,
+                    "threshold_used": self.confidence_threshold,
+                    "candidates_evaluated": candidates_evaluated,
                     "error": None,
                 }
 
+        best_result["candidates_evaluated"] = candidates_evaluated
         return best_result
 
     def _judge_candidate(self, client, prompt, row):
@@ -193,13 +224,13 @@ Answer with ONLY one word: MATCH or NO_MATCH"""
             )
             llm_response = response.choices[0].message.content.strip()
         except Exception:
-            return 0.0  # Fail safe
+            return "NO_MATCH"  # Fail safe
 
         response_upper = llm_response.upper().replace(".", "").replace('"', "")
         if "MATCH" in response_upper and "NO" not in response_upper:
-            return 1.0
+            return "MATCH"
         else:
-            return 0.0
+            return "NO_MATCH"
 
 # COMMAND ----------
 
@@ -230,6 +261,11 @@ output_example = pd.DataFrame({
     "confidence": [1.0],
     "corpus_id": ["QA-0001"],
     "matched_question": ["What is the total ad spend for {period}?"],
+    "vs_score": [0.68],
+    "judge_verdict": ["MATCH"],
+    "reason": ["Intent matched certified template"],
+    "threshold_used": [0.5],
+    "candidates_evaluated": [1],
     "error": [None],
 })
 signature = infer_signature(input_example, output_example)

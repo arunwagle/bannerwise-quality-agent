@@ -8,7 +8,6 @@ import os
 import time
 import logging
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.serving import DataframeSplitInput
 
 logger = logging.getLogger(__name__)
 
@@ -51,19 +50,29 @@ def assess_prompt(prompt: str) -> dict:
         else:
             prediction = {}
 
-        # Handle both dict and list-of-dicts response formats
+        # Extract fields
         if isinstance(prediction, dict):
             lane = prediction.get("lane", "analytical")
             confidence = prediction.get("confidence", 0.0)
             corpus_id = prediction.get("corpus_id")
             matched_question = prediction.get("matched_question")
+            vs_score = prediction.get("vs_score", 0.0)
+            judge_verdict = prediction.get("judge_verdict", "UNKNOWN")
+            reason = prediction.get("reason", "")
+            threshold_used = prediction.get("threshold_used", 0.5)
+            candidates_evaluated = prediction.get("candidates_evaluated", 0)
             error = prediction.get("error")
         else:
             lane = "analytical"
             confidence = 0.0
             corpus_id = None
             matched_question = None
-            error = f"Unexpected response format: {type(prediction)}"
+            vs_score = 0.0
+            judge_verdict = "UNKNOWN"
+            reason = f"Unexpected response format: {type(prediction)}"
+            threshold_used = 0.5
+            candidates_evaluated = 0
+            error = reason
 
         if lane == "certified":
             return {
@@ -74,6 +83,11 @@ def assess_prompt(prompt: str) -> dict:
                 "provenance": {
                     "corpus_id": corpus_id,
                     "matched_question": matched_question,
+                    "vs_score": vs_score,
+                    "judge_verdict": judge_verdict,
+                    "reason": reason,
+                    "threshold_used": threshold_used,
+                    "candidates_evaluated": candidates_evaluated,
                     "endpoint": ENDPOINT_NAME,
                 },
                 "latency_ms": latency_ms,
@@ -87,7 +101,11 @@ def assess_prompt(prompt: str) -> dict:
                 "provenance": {
                     "corpus_id": corpus_id,
                     "matched_question": matched_question,
-                    "reason": error or "Below confidence threshold or no match",
+                    "vs_score": vs_score,
+                    "judge_verdict": judge_verdict,
+                    "reason": reason,
+                    "threshold_used": threshold_used,
+                    "candidates_evaluated": candidates_evaluated,
                     "endpoint": ENDPOINT_NAME,
                 },
                 "latency_ms": latency_ms,
@@ -101,6 +119,10 @@ def assess_prompt(prompt: str) -> dict:
             "badge": "ERROR",
             "confidence": 0.0,
             "lane": "error",
-            "provenance": {"error": str(e), "endpoint": ENDPOINT_NAME},
+            "provenance": {
+                "error": str(e),
+                "endpoint": ENDPOINT_NAME,
+                "reason": f"Endpoint error: {str(e)[:100]}",
+            },
             "latency_ms": latency_ms,
         }
