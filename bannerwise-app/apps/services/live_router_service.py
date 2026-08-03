@@ -75,8 +75,19 @@ def assess_prompt(prompt: str) -> dict:
             error = reason
 
         if lane == "certified":
+            # Execute Certified Lane: lookup SQL, extract params, execute, format answer
+            from services.certified_lane_service import execute_certified_lane
+
+            certified_result = execute_certified_lane(
+                prompt=prompt,
+                corpus_id=corpus_id,
+                matched_question=matched_question,
+            )
+
+            total_latency = latency_ms + certified_result.get("latency_ms", 0)
+
             return {
-                "answer": f"[Certified Answer] Matched: {matched_question}",
+                "answer": certified_result["answer"],
                 "badge": "HUMAN APPROVED",
                 "confidence": round(confidence, 3),
                 "lane": "certified",
@@ -89,8 +100,11 @@ def assess_prompt(prompt: str) -> dict:
                     "threshold_used": threshold_used,
                     "candidates_evaluated": candidates_evaluated,
                     "endpoint": ENDPOINT_NAME,
+                    "sql_executed": certified_result.get("sql_executed"),
+                    "params_extracted": certified_result.get("params_extracted"),
+                    "answer_template": certified_result.get("answer_template"),
                 },
-                "latency_ms": latency_ms,
+                "latency_ms": total_latency,
             }
         else:
             return {

@@ -35,6 +35,16 @@ resources:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
 
+        - task_key: create_synthetic_data
+          description: 'Create data tables referenced by certified SQL templates (for Certified Lane execution)'
+          depends_on:
+            - task_key: create_tables
+          notebook_task:
+            notebook_path: ../tests/notebooks/create_synthetic_data.py
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+
       queue:
         enabled: true
 
