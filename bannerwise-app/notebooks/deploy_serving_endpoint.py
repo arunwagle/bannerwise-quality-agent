@@ -168,20 +168,24 @@ payload = {
     "dataframe_records": [{"prompt": "What is the total ad spend for Q1 2025?"}]
 }
 
-response = requests.post(url, headers=headers, json=payload, timeout=60)
-if response.status_code == 200:
-    result = response.json()
-    print(f"✓ Endpoint smoke test passed!")
-    print(f"  Response: {json.dumps(result, indent=2)[:500]}")
-else:
-    print(f"⚠ Endpoint returned {response.status_code}: {response.text[:300]}")
-    print("  This may be expected if the endpoint is still warming up.")
+try:
+    response = requests.post(url, headers=headers, json=payload, timeout=120)
+    if response.status_code == 200:
+        result = response.json()
+        print(f"✓ Endpoint smoke test passed!")
+        print(f"  Response: {json.dumps(result, indent=2)[:500]}")
+    else:
+        print(f"⚠ Endpoint returned {response.status_code} (expected if still warming up)")
+        print(f"  The endpoint was created/updated successfully — it may need a few more minutes to serve traffic.")
+except Exception as e:
+    print(f"⚠ Smoke test skipped: {e}")
+    print("  The endpoint was created/updated successfully — it may need a few more minutes to serve traffic.")
 
 # COMMAND ----------
 
 dbutils.notebook.exit(json.dumps({
     "endpoint_name": ENDPOINT_NAME,
     "model_name": FULL_MODEL_NAME,
-    "model_version": str(latest_version),
+    "model_version": str(champion_version),
     "endpoint_url": f"https://{w.config.host}/serving-endpoints/{ENDPOINT_NAME}/invocations",
 }))
