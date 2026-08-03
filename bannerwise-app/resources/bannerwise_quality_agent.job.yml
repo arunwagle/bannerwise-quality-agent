@@ -347,3 +347,56 @@ resources:
 
       queue:
         enabled: true
+
+    # ─────────────────────────────────────────────────────────────
+    # Cleanup Job — Resets environment to pre-deploy state
+    # ─────────────────────────────────────────────────────────────
+    cleanup_job:
+      name: 'bannerwise-quality-agent-cleanup'
+      description: 'Resets environment by removing deployed resources (VS index, serving endpoint, model)'
+      tags:
+        project: bannerwise-quality-agent
+        purpose: cleanup
+
+      parameters:
+        - name: catalog_name
+          default: ${var.catalog_name}
+        - name: schema_name
+          default: ${var.schema_name}
+        - name: vs_endpoint_name
+          default: ${resources.vector_search_endpoints.bannerwise_vs_endpoint.id}
+        - name: serving_endpoint_name
+          default: ${var.serving_endpoint_name}
+        - name: model_name
+          default: ${var.model_name}
+
+      tasks:
+        - task_key: cleanup_vector_index
+          description: 'Remove the Delta Sync Vector Search index'
+          notebook_task:
+            notebook_path: ../notebooks/vs/cleanup_vector_index.py
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+              vs_endpoint_name: '{{job.parameters.vs_endpoint_name}}'
+
+        - task_key: cleanup_serving_endpoint
+          description: 'Remove the router model serving endpoint'
+          notebook_task:
+            notebook_path: ../notebooks/agent/cleanup_serving_endpoint.py
+            base_parameters:
+              serving_endpoint_name: '{{job.parameters.serving_endpoint_name}}'
+
+        - task_key: cleanup_registered_model
+          description: 'Remove the registered model from Unity Catalog'
+          depends_on:
+            - task_key: cleanup_serving_endpoint
+          notebook_task:
+            notebook_path: ../notebooks/agent/cleanup_registered_model.py
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+              model_name: '{{job.parameters.model_name}}'
+
+      queue:
+        enabled: true
