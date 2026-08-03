@@ -259,20 +259,23 @@ print("\n✓ Model validation passed")
 
 # COMMAND ----------
 
-# Set "challenger" alias on the new version
+# Set "champion" alias — this task only runs AFTER eval passes
 client = mlflow.MlflowClient()
 versions = client.search_model_versions(f"name='{FULL_MODEL_NAME}'")
 new_version = max(int(v.version) for v in versions)
-client.set_registered_model_alias(FULL_MODEL_NAME, "challenger", new_version)
-print(f"\n✓ Alias 'challenger' set → version {new_version}")
 
-# Check if a champion exists
+# Archive old champion if exists
 try:
-    champion = client.get_model_version_by_alias(FULL_MODEL_NAME, "champion")
-    print(f"  Current champion: version {champion.version}")
-    print(f"  Challenger: version {new_version}")
+    old_champion = client.get_model_version_by_alias(FULL_MODEL_NAME, "champion")
+    if int(old_champion.version) != new_version:
+        client.set_registered_model_alias(FULL_MODEL_NAME, "archived_champion", old_champion.version)
+        print(f"  Archived old champion v{old_champion.version}")
 except Exception:
-    print(f"  No champion exists yet — first deployment will promote challenger to champion")
+    pass
+
+client.set_registered_model_alias(FULL_MODEL_NAME, "champion", new_version)
+print(f"\n✓ Champion set → version {new_version}")
+print(f"  (Eval quality gate passed — safe to deploy)")
 
 # Pass model info to next task
 dbutils.jobs.taskValues.set(key="model_uri", value=model_info.model_uri)
@@ -282,5 +285,5 @@ dbutils.notebook.exit(json.dumps({
     "model_uri": model_info.model_uri,
     "model_name": FULL_MODEL_NAME,
     "model_version": str(new_version),
-    "alias": "challenger",
+    "alias": "champion",
 }))

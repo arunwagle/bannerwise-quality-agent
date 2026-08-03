@@ -120,72 +120,24 @@ except Exception as e:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Wait for Endpoint to be Ready
+# MAGIC ## Done — Endpoint Triggered
+# MAGIC The endpoint create/update has been triggered. It will warm up asynchronously.
+# MAGIC No need to wait here (avoids burning DBUs while polling).
 
 # COMMAND ----------
 
-print(f"Waiting for endpoint '{ENDPOINT_NAME}' to be ready...")
-max_wait_min = 15
-start = time.time()
-
-while True:
-    endpoint = w.serving_endpoints.get(ENDPOINT_NAME)
-    state = endpoint.state
-
-    if state.ready == "READY":
-        elapsed = (time.time() - start) / 60
-        print(f"\n✓ Endpoint READY in {elapsed:.1f} minutes")
-        print(f"  URL: https://{w.config.host}/serving-endpoints/{ENDPOINT_NAME}/invocations")
-        break
-    elif state.config_update == "UPDATE_FAILED":
-        raise Exception(f"Endpoint update FAILED: {state}")
-
-    elapsed = (time.time() - start) / 60
-    if elapsed > max_wait_min:
-        print(f"\n⚠ Endpoint not ready after {max_wait_min} min (state: {state})")
-        print("  The endpoint may still be starting up. Check the UI.")
-        break
-
-    print(f"  State: {state.ready} / config: {state.config_update} ({elapsed:.1f} min)")
-    time.sleep(30)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Validate Endpoint
-
-# COMMAND ----------
-
-import requests
-
-# Quick smoke test
-token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
-host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().get()
-
-url = f"{host}/serving-endpoints/{ENDPOINT_NAME}/invocations"
-headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-payload = {
-    "dataframe_records": [{"prompt": "What is the total ad spend for Q1 2025?"}]
-}
-
-try:
-    response = requests.post(url, headers=headers, json=payload, timeout=120)
-    if response.status_code == 200:
-        result = response.json()
-        print(f"✓ Endpoint smoke test passed!")
-        print(f"  Response: {json.dumps(result, indent=2)[:500]}")
-    else:
-        print(f"⚠ Endpoint returned {response.status_code} (expected if still warming up)")
-        print(f"  The endpoint was created/updated successfully — it may need a few more minutes to serve traffic.")
-except Exception as e:
-    print(f"⚠ Smoke test skipped: {e}")
-    print("  The endpoint was created/updated successfully — it may need a few more minutes to serve traffic.")
-
-# COMMAND ----------
+endpoint_url = f"https://{w.config.host}/serving-endpoints/{ENDPOINT_NAME}/invocations"
+print(f"✓ Endpoint create/update triggered successfully")
+print(f"  Endpoint: {ENDPOINT_NAME}")
+print(f"  Model: {FULL_MODEL_NAME} v{champion_version} (champion)")
+print(f"  URL: {endpoint_url}")
+print(f"  Scale-to-zero: {SCALE_TO_ZERO}")
+print(f"\n  Note: Endpoint will warm up asynchronously (2-10 min for first deploy)")
 
 dbutils.notebook.exit(json.dumps({
     "endpoint_name": ENDPOINT_NAME,
     "model_name": FULL_MODEL_NAME,
     "model_version": str(champion_version),
-    "endpoint_url": f"https://{w.config.host}/serving-endpoints/{ENDPOINT_NAME}/invocations",
+    "endpoint_url": endpoint_url,
+    "status": "TRIGGERED",
 }))

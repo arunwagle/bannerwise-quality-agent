@@ -82,7 +82,7 @@ resources:
 
       tasks:
         - task_key: run_router_agent
-          description: 'Execute the supervisor agent with the given prompt and configuration'
+          description: 'Fast-fail smoke test — validates router runs without errors'
           notebook_task:
             notebook_path: ../notebooks/router_agent
             base_parameters:
@@ -98,24 +98,10 @@ resources:
               genie_timeout_sec: '{{job.parameters.genie_timeout_sec}}'
               sql_warehouse_id: '{{job.parameters.sql_warehouse_id}}'
 
-        - task_key: register_model
-          description: 'Register router agent as MLflow model (challenger alias) in Unity Catalog'
+        - task_key: run_eval
+          description: 'Quality gate — router must pass precision/recall thresholds'
           depends_on:
             - task_key: run_router_agent
-          notebook_task:
-            notebook_path: ../notebooks/register_router_model
-            base_parameters:
-              catalog_name: '{{job.parameters.catalog_name}}'
-              schema_name: '{{job.parameters.schema_name}}'
-              model_name: '{{job.parameters.model_name}}'
-              vs_endpoint: '{{job.parameters.vs_endpoint}}'
-              judge_model: '{{job.parameters.judge_model}}'
-              confidence_threshold: '{{job.parameters.confidence_threshold}}'
-
-        - task_key: run_eval
-          description: 'Quality gate — challenger must pass eval to be promoted to champion'
-          depends_on:
-            - task_key: register_model
           run_job_task:
             job_id: ${resources.jobs.eval_job.id}
             job_parameters:
@@ -126,21 +112,24 @@ resources:
               judge_model: '{{job.parameters.judge_model}}'
               confidence_threshold: '{{job.parameters.confidence_threshold}}'
 
-        - task_key: promote_to_champion
-          description: 'Promote challenger to champion after eval quality gate passes'
+        - task_key: register_model
+          description: 'Register router as MLflow model (champion) — only runs after eval passes'
           depends_on:
             - task_key: run_eval
           notebook_task:
-            notebook_path: ../notebooks/promote_to_champion
+            notebook_path: ../notebooks/register_router_model
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
               model_name: '{{job.parameters.model_name}}'
+              vs_endpoint: '{{job.parameters.vs_endpoint}}'
+              judge_model: '{{job.parameters.judge_model}}'
+              confidence_threshold: '{{job.parameters.confidence_threshold}}'
 
         - task_key: deploy_serving_endpoint
-          description: 'Deploy the champion model to the Model Serving endpoint'
+          description: 'Trigger Model Serving endpoint update (does not wait for warmup)'
           depends_on:
-            - task_key: promote_to_champion
+            - task_key: register_model
           notebook_task:
             notebook_path: ../notebooks/deploy_serving_endpoint
             base_parameters:
