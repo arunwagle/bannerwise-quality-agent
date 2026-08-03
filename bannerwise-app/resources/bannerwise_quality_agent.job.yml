@@ -112,7 +112,7 @@ resources:
           run_job_task:
             job_id: ${resources.jobs.eval_job.id}
             job_parameters:
-              regenerate_dataset: 'false'
+              regenerate_dataset: 'true'
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
               vs_endpoint: '{{job.parameters.vs_endpoint}}'
