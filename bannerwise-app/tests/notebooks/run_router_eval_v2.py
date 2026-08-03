@@ -493,7 +493,8 @@ results_df = (
 )
 
 # Materialize results (triggers execution)
-results_df = results_df.cache()
+results_df.write.mode('overwrite').saveAsTable(f'{CATALOG}.{SCHEMA}._eval_temp')
+results_df = spark.table(f'{CATALOG}.{SCHEMA}._eval_temp')
 result_count = results_df.count()
 
 elapsed = time.time() - start_time
