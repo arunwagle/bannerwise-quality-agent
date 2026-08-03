@@ -1,7 +1,7 @@
 resources:
   apps:
     bannerwise_quality_agent:
-      name: '${workspace.current_user.domain_friendly_name}-bannerwise-quality-agent'
+      name: 'aw-bannerwise-quality-agent'
       source_code_path: ../apps
       description: 'Bannerwise Quality Agent — AI-powered banner quality assessment app'
 

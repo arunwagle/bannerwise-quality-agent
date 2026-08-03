@@ -20,7 +20,7 @@ resources:
         - task_key: create_tables
           description: 'Run DDL to create data model tables (if not exist)'
           notebook_task:
-            notebook_path: ../notebooks/create_tables
+            notebook_path: ../notebooks/create_tables.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -30,7 +30,7 @@ resources:
           depends_on:
             - task_key: create_tables
           notebook_task:
-            notebook_path: ../tests/notebooks/setup_test_data
+            notebook_path: ../tests/notebooks/setup_test_data.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -91,7 +91,7 @@ resources:
         - task_key: run_router_agent
           description: 'Fast-fail smoke test — validates router runs without errors'
           notebook_task:
-            notebook_path: ../notebooks/router_agent
+            notebook_path: ../notebooks/router_agent.py
             base_parameters:
               prompt: '{{job.parameters.prompt}}'
               catalog_name: '{{job.parameters.catalog_name}}'
@@ -124,7 +124,7 @@ resources:
           depends_on:
             - task_key: run_eval
           notebook_task:
-            notebook_path: ../notebooks/register_router_model
+            notebook_path: ../notebooks/register_router_model.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -138,7 +138,7 @@ resources:
           depends_on:
             - task_key: register_model
           notebook_task:
-            notebook_path: ../notebooks/deploy_serving_endpoint
+            notebook_path: ../notebooks/deploy_serving_endpoint.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -153,7 +153,7 @@ resources:
           depends_on:
             - task_key: deploy_serving_endpoint
           notebook_task:
-            notebook_path: ../notebooks/configure_ai_gateway
+            notebook_path: ../notebooks/configure_ai_gateway.py
             base_parameters:
               endpoint_name: '{{job.parameters.endpoint_name}}'
               catalog_name: '{{job.parameters.catalog_name}}'
@@ -211,7 +211,7 @@ resources:
         - task_key: generate_eval_dataset
           description: 'LLM-powered eval dataset generation from certified corpus'
           notebook_task:
-            notebook_path: ../tests/notebooks/generate_eval_dataset
+            notebook_path: ../tests/notebooks/generate_eval_dataset.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -227,7 +227,7 @@ resources:
           depends_on:
             - task_key: generate_eval_dataset
           notebook_task:
-            notebook_path: ../tests/notebooks/run_router_eval_v2
+            notebook_path: ../tests/notebooks/run_router_eval_v2.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -242,7 +242,7 @@ resources:
           depends_on:
             - task_key: run_router_eval
           notebook_task:
-            notebook_path: ../tests/notebooks/check_eval_thresholds
+            notebook_path: ../tests/notebooks/check_eval_thresholds.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
