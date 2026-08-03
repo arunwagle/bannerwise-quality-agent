@@ -466,8 +466,8 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
 - Endpoint: real-time inference, autoscaling
 - Input: `{"prompt": "..."}`
 - Output: `RouterResult` JSON
-- **Deployment**: Defined in `resources/bannerwise_quality_agent.ai.yml` (model_serving_endpoints)
-- The supervisor agent is registered to UC via MLflow, then served via the resource-defined endpoint
+- **Deployment**: Deployed via `router_agent_job` → `deploy_serving_endpoint` task
+- The supervisor agent is registered to UC via MLflow, then served via Model Serving
 
 ### 4. Vector Search
 
@@ -477,7 +477,7 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
 - Embedding model: `databricks-bge-large-en`
 - Columns synced: `id`, `question`, `parameterized_sql`, `answer_template`, `parameters`, `status`, `certified_by`, `certified_date`, `next_review_date`
 - Pipeline type: `TRIGGERED`
-- **Deployment**: Both endpoint and index defined in `resources/bannerwise_quality_agent.ai.yml`
+- **Deployment**: VS endpoint created via bundle (`resources/bannerwise_quality_agent.ai.yml`); VS index created by `vector_index_job` (requires corpus table to exist first)
 
 ---
 
