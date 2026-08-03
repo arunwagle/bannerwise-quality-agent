@@ -17,28 +17,28 @@ resources:
           default: bannerhealth
 
       tasks:
-        - task_key: create_tables
-          description: 'Run DDL to create data model tables (if not exist)'
+        - task_key: create_schema_and_tables
+          description: 'Create Delta tables for corpus, query history, and review queue (DDL only, no data)'
           notebook_task:
             notebook_path: ../notebooks/create_tables.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
 
-        - task_key: generate_synthetic_data
-          description: 'Populate tables with synthetic test data using dbldatagen'
+        - task_key: populate_corpus_and_history
+          description: 'Populate certified QA corpus, query history, and SME review queue with synthetic data'
           depends_on:
-            - task_key: create_tables
+            - task_key: create_schema_and_tables
           notebook_task:
             notebook_path: ../tests/notebooks/setup_test_data.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
 
-        - task_key: create_synthetic_data
-          description: 'Create data tables referenced by certified SQL templates (for Certified Lane execution)'
+        - task_key: create_analytics_tables
+          description: 'Create analytics tables (ad_metrics, campaign_metrics, etc.) used by certified SQL templates'
           depends_on:
-            - task_key: create_tables
+            - task_key: create_schema_and_tables
           notebook_task:
             notebook_path: ../tests/notebooks/create_synthetic_data.py
             base_parameters:
