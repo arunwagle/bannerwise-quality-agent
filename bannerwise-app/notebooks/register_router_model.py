@@ -68,39 +68,17 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
 
     def predict(self, context, model_input: pd.DataFrame) -> pd.DataFrame:
         """Route each prompt to certified or analytical lane."""
-        import os
         from databricks.sdk import WorkspaceClient
-        from openai import OpenAI
         from datetime import date
         import json
 
         w = WorkspaceClient()
-        host = os.environ.get("DATABRICKS_HOST", f"https://{w.config.host}")
-        if not host.startswith("http"):
-            host = f"https://{host}"
-
-        # Get token — works in Model Serving, serverless notebooks, and local
-        token = os.environ.get("DATABRICKS_TOKEN")  # Model Serving
-        if not token:
-            token = w.config.token  # PAT-based auth
-        if not token:
-            # OAuth/serverless: extract token from SDK credential provider
-            creds = w.config.authenticate()
-            if callable(creds):
-                auth_headers = creds()
-                if isinstance(auth_headers, dict):
-                    token = auth_headers.get("Authorization", "").replace("Bearer ", "")
-
-        if not token:
-            raise RuntimeError("Cannot obtain auth token for LLM calls")
-
-        client = OpenAI(api_key=token, base_url=f"{host}/serving-endpoints")
 
         results = []
         for _, row in model_input.iterrows():
             prompt = row["prompt"]
             try:
-                result = self._route_prompt(w, client, prompt)
+                result = self._route_prompt(w, prompt)
             except Exception as e:
                 result = {
                     "lane": "analytical",
@@ -114,7 +92,7 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
 
         return pd.DataFrame(results)
 
-    def _route_prompt(self, w, client, prompt):
+    def _route_prompt(self, w, prompt):
         """Core routing logic: retrieve top-3 → judge each → gate."""
         from datetime import date
 
@@ -150,7 +128,7 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
             row = dict(zip(columns, candidate_row))
             candidates_evaluated += 1
             vs_score = float(candidate_row[-1]) if len(candidate_row) > len(columns) - 1 else 0.0
-            judge_verdict = self._judge_candidate(client, prompt, row)
+            judge_verdict = self._judge_candidate(w, prompt, row)
             confidence = 1.0 if judge_verdict == "MATCH" else 0.0
 
             # Staleness check
@@ -207,7 +185,7 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
         best_result["candidates_evaluated"] = candidates_evaluated
         return best_result
 
-    def _judge_candidate(self, client, prompt, row):
+    def _judge_candidate(self, w, prompt, row):
         """Binary judge: asks LLM if intent matches. Returns 1.0 or 0.0."""
         judge_prompt = f"""You are an intent matching judge. Determine if the user question asks the SAME thing as the certified question template.
 
@@ -230,8 +208,8 @@ Certified template: "{row['question']}"
 Answer with ONLY one word: MATCH or NO_MATCH"""
 
         try:
-            response = client.chat.completions.create(
-                model=self.judge_model,
+            response = w.serving_endpoints.query(
+                name=self.judge_model,
                 messages=[{"role": "user", "content": judge_prompt}],
                 temperature=0.0,
                 max_tokens=10,
@@ -299,7 +277,6 @@ with mlflow.start_run(run_name="register_router_model") as run:
         input_example=input_example,
         pip_requirements=[
             "mlflow>=2.12.0",
-            "openai",
             "databricks-sdk",
             "databricks-vectorsearch",
             "pandas",
@@ -316,13 +293,6 @@ with mlflow.start_run(run_name="register_router_model") as run:
 # MAGIC ## Validate Model
 
 # COMMAND ----------
-
-# Set DATABRICKS_TOKEN env var so the model can authenticate during validation
-# (In Model Serving this is auto-injected; in notebooks we set it manually)
-import os
-_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
-os.environ["DATABRICKS_TOKEN"] = _token
-os.environ["DATABRICKS_HOST"] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().get()
 
 # Quick validation
 loaded = mlflow.pyfunc.load_model(model_info.model_uri)
