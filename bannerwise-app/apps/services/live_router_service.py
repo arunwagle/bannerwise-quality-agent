@@ -1,28 +1,23 @@
 """Live Router Service — calls the Model Serving endpoint.
 
-Replaces mock_router_service when API_MODE='live'.
-Same interface: assess_prompt(prompt) → dict
+Uses Databricks SDK for authentication (auto-configures in Apps runtime).
+Same interface as mock_router_service: assess_prompt(prompt) → dict
 """
 
 import os
 import time
 import logging
-import requests
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.serving import DataframeSplitInput
 
 logger = logging.getLogger(__name__)
 
-# Configuration from environment
 ENDPOINT_NAME = os.environ.get("SERVING_ENDPOINT_NAME", "bannerwise-quality-router")
-DATABRICKS_HOST = os.environ.get("DATABRICKS_HOST", "")
-DATABRICKS_TOKEN = os.environ.get("DATABRICKS_TOKEN", "")
 
 
-def _get_endpoint_url():
-    """Build the serving endpoint invocation URL."""
-    host = DATABRICKS_HOST.rstrip("/")
-    if not host.startswith("http"):
-        host = f"https://{host}"
-    return f"{host}/serving-endpoints/{ENDPOINT_NAME}/invocations"
+def _get_client():
+    """Get authenticated WorkspaceClient (auto-configures in Apps runtime)."""
+    return WorkspaceClient()
 
 
 def assess_prompt(prompt: str) -> dict:
@@ -35,28 +30,40 @@ def assess_prompt(prompt: str) -> dict:
         RouterResult dict with badge, confidence, lane, answer, and provenance.
     """
     start_time = time.time()
-    url = _get_endpoint_url()
-    headers = {
-        "Authorization": f"Bearer {DATABRICKS_TOKEN}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "dataframe_records": [{"prompt": prompt}]
-    }
 
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        response.raise_for_status()
-        result = response.json()
+        w = _get_client()
+
+        # Use SDK to call serving endpoint (handles auth automatically)
+        response = w.serving_endpoints.query(
+            name=ENDPOINT_NAME,
+            dataframe_records=[{"prompt": prompt}],
+        )
+
         latency_ms = int((time.time() - start_time) * 1000)
 
         # Parse model response
-        prediction = result.get("predictions", [{}])[0]
-        lane = prediction.get("lane", "analytical")
-        confidence = prediction.get("confidence", 0.0)
-        corpus_id = prediction.get("corpus_id")
-        matched_question = prediction.get("matched_question")
-        error = prediction.get("error")
+        predictions = response.predictions
+        if isinstance(predictions, list) and len(predictions) > 0:
+            prediction = predictions[0]
+        elif isinstance(predictions, dict):
+            prediction = predictions
+        else:
+            prediction = {}
+
+        # Handle both dict and list-of-dicts response formats
+        if isinstance(prediction, dict):
+            lane = prediction.get("lane", "analytical")
+            confidence = prediction.get("confidence", 0.0)
+            corpus_id = prediction.get("corpus_id")
+            matched_question = prediction.get("matched_question")
+            error = prediction.get("error")
+        else:
+            lane = "analytical"
+            confidence = 0.0
+            corpus_id = None
+            matched_question = None
+            error = f"Unexpected response format: {type(prediction)}"
 
         if lane == "certified":
             return {
@@ -80,39 +87,20 @@ def assess_prompt(prompt: str) -> dict:
                 "provenance": {
                     "corpus_id": corpus_id,
                     "matched_question": matched_question,
-                    "reason": "Below confidence threshold or no match",
+                    "reason": error or "Below confidence threshold or no match",
                     "endpoint": ENDPOINT_NAME,
                 },
                 "latency_ms": latency_ms,
             }
 
-    except requests.exceptions.Timeout:
-        logger.error(f"Serving endpoint timeout: {url}")
-        return {
-            "answer": None,
-            "badge": "ERROR",
-            "confidence": 0.0,
-            "lane": "error",
-            "provenance": {"error": "Endpoint timeout (30s)"},
-            "latency_ms": int((time.time() - start_time) * 1000),
-        }
-    except requests.exceptions.HTTPError as e:
-        logger.error(f"Serving endpoint error: {e.response.status_code} - {e.response.text[:200]}")
-        return {
-            "answer": None,
-            "badge": "ERROR",
-            "confidence": 0.0,
-            "lane": "error",
-            "provenance": {"error": f"HTTP {e.response.status_code}: {e.response.text[:100]}"},
-            "latency_ms": int((time.time() - start_time) * 1000),
-        }
     except Exception as e:
-        logger.error(f"Serving endpoint exception: {e}")
+        latency_ms = int((time.time() - start_time) * 1000)
+        logger.error(f"Serving endpoint error: {e}")
         return {
             "answer": None,
             "badge": "ERROR",
             "confidence": 0.0,
             "lane": "error",
-            "provenance": {"error": str(e)},
-            "latency_ms": int((time.time() - start_time) * 1000),
+            "provenance": {"error": str(e), "endpoint": ENDPOINT_NAME},
+            "latency_ms": latency_ms,
         }
