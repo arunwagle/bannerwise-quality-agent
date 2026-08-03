@@ -4,17 +4,50 @@ bundle:
 include:
   - resources/*.yml
 
+variables:
+  catalog_name:
+    default: aw_serverless_stable_catalog
+    description: Unity Catalog catalog for all project tables
+  schema_name:
+    default: bannerhealth
+    description: Schema for all project tables
+  sql_warehouse_id:
+    default: '2d8e531640ffa469'
+    description: SQL warehouse for query execution
+  judge_model:
+    default: databricks-meta-llama-3-3-70b-instruct
+    description: LLM model for intent reranking and eval
+  serving_endpoint_name:
+    default: bannerwise-quality-router
+    description: Router model serving endpoint name
+  model_name:
+    default: bannerwise_quality_router
+    description: UC registered model name
+  app_sp_name:
+    default: ''
+    description: App service principal name (auto-created with app)
+  confidence_threshold:
+    default: '0.5'
+    description: Confidence gate threshold for certified lane routing
+  shrink_factor:
+    default: '1.0'
+    description: Linear shrink factor for confidence calibration
+
 targets:
   dev:
     mode: development
     default: true
     workspace:
       host: https://fevm-aw-serverless-stable.cloud.databricks.com
+    variables:
+      app_sp_name: 'app-3hjyzw dev-bw-quality-agent'
   prod:
     mode: production
     workspace:
       host: https://fevm-aw-serverless-stable.cloud.databricks.com
       root_path: /Workspace/Users/arun.wagle@databricks.com/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      app_sp_name: ''
     permissions:
       - user_name: arun.wagle@databricks.com
         level: CAN_MANAGE

@@ -12,9 +12,9 @@ resources:
 
       parameters:
         - name: catalog_name
-          default: aw_serverless_stable_catalog
+          default: ${var.catalog_name}
         - name: schema_name
-          default: bannerhealth
+          default: ${var.schema_name}
 
       tasks:
         - task_key: create_schema_and_tables
@@ -50,19 +50,19 @@ resources:
 
       parameters:
         - name: catalog_name
-          default: aw_serverless_stable_catalog
+          default: ${var.catalog_name}
         - name: schema_name
-          default: bannerhealth
+          default: ${var.schema_name}
         - name: app_sp_name
-          default: 'app-3hjyzw aw-bannerwise-quality-agent'
+          default: ${var.app_sp_name}
         - name: sql_warehouse_id
-          default: '2d8e531640ffa469'
+          default: ${var.sql_warehouse_id}
         - name: serving_endpoint_name
-          default: 'bannerwise-quality-router'
+          default: ${var.serving_endpoint_name}
         - name: vs_endpoint_name
-          default: 'bannerwise-vs-endpoint'
+          default: ${resources.vector_search_endpoints.bannerwise_vs_endpoint.id}
         - name: llm_endpoint_name
-          default: 'databricks-meta-llama-3-3-70b-instruct'
+          default: ${var.judge_model}
 
       tasks:
         - task_key: configure_uc_access
@@ -107,9 +107,9 @@ resources:
 
       parameters:
         - name: catalog_name
-          default: aw_serverless_stable_catalog
+          default: ${var.catalog_name}
         - name: schema_name
-          default: bannerhealth
+          default: ${var.schema_name}
 
       tasks:
         - task_key: setup_certified_corpus
@@ -148,29 +148,29 @@ resources:
         - name: prompt
           default: 'What is the total ad spend for Q1 2025?'
         - name: catalog_name
-          default: aw_serverless_stable_catalog
+          default: ${var.catalog_name}
         - name: schema_name
-          default: bannerhealth
+          default: ${var.schema_name}
         - name: vs_endpoint
-          default: bannerwise-vs-endpoint
+          default: ${resources.vector_search_endpoints.bannerwise_vs_endpoint.id}
         - name: vs_top_k
           default: '3'
         - name: confidence_threshold
-          default: '0.5'
+          default: ${var.confidence_threshold}
         - name: shrink_factor
-          default: '1.0'
+          default: ${var.shrink_factor}
         - name: judge_model
-          default: databricks-meta-llama-3-3-70b-instruct
+          default: ${var.judge_model}
         - name: genie_space_id
           default: ''
         - name: genie_timeout_sec
           default: '30'
         - name: sql_warehouse_id
-          default: 2d8e531640ffa469
+          default: ${var.sql_warehouse_id}
         - name: model_name
-          default: bannerwise_quality_router
+          default: ${var.model_name}
         - name: endpoint_name
-          default: bannerwise-quality-router
+          default: ${var.serving_endpoint_name}
         - name: workload_size
           default: Small
         - name: scale_to_zero
@@ -180,7 +180,7 @@ resources:
         - name: rate_limit_period
           default: minute
         - name: app_service_principal
-          default: 'app-3hjyzw aw-bannerwise-quality-agent'
+          default: ${var.app_sp_name}
 
       tasks:
         - task_key: run_router_agent
@@ -272,9 +272,9 @@ resources:
 
       parameters:
         - name: catalog_name
-          default: aw_serverless_stable_catalog
+          default: ${var.catalog_name}
         - name: schema_name
-          default: bannerhealth
+          default: ${var.schema_name}
         - name: num_paraphrases
           default: '2'
         - name: num_near_misses
@@ -284,7 +284,7 @@ resources:
         - name: num_param_variations
           default: '1'
         - name: judge_model
-          default: databricks-meta-llama-3-3-70b-instruct
+          default: ${var.judge_model}
         - name: regenerate_dataset
           default: 'true'
         - name: min_precision
@@ -294,13 +294,13 @@ resources:
         - name: fail_on_gate_miss
           default: 'true'
         - name: confidence_threshold
-          default: '0.5'
+          default: ${var.confidence_threshold}
         - name: shrink_factor
-          default: '1.0'
+          default: ${var.shrink_factor}
         - name: vs_endpoint
-          default: bannerwise-vs-endpoint
+          default: ${resources.vector_search_endpoints.bannerwise_vs_endpoint.id}
         - name: sql_warehouse_id
-          default: 2d8e531640ffa469
+          default: ${var.sql_warehouse_id}
 
       tasks:
         - task_key: generate_eval_dataset
