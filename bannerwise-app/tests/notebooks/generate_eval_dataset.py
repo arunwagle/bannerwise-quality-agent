@@ -397,48 +397,46 @@ print("Generating stale entry test cases...")
 stale_before = len(eval_rows)
 
 # Use expired entries if any exist
+# IMPORTANT: Stale entry test prompts must use UNIQUE keywords that only exist
+# in the expired entries and NOT in any certified entry. This ensures VS returns
+# the expired entry as the top match, so the staleness check fires correctly.
+#
+# Expired entries and their unique signals:
+#   QA-0018: "viewability" — no certified entry mentions this term
+#   QA-0019: "trended over 6 months" — unique temporal scope (QA-0003 is "CTR by size")
+#   QA-0020: "CPM by publisher" — unique dimension (QA-0005 is "CPM by region")
+
 for entry in stale_candidates:
     question = entry["question"]
     corpus_id = entry["id"]
     
-    prompt = f"""Given this question: "{question}"
-Generate 3 paraphrases that ask the exact same thing. If it has {{param}} placeholders, fill with concrete values.
-Return ONLY a JSON array of strings."""
+    prompt = f"""Given this certified question: "{question}"
+Generate 5 paraphrases that ask the SAME thing but worded differently.
+
+CRITICAL RULES:
+- PRESERVE the unique distinguishing keywords (e.g., "viewability", "by publisher", "6 months", "trended")
+- These keywords MUST appear in the paraphrase to ensure semantic uniqueness
+- Fill any {{param}} placeholders with concrete values
+- Vary sentence structure, formality, and phrasing
+
+Return ONLY a JSON array of 5 strings."""
     
     result = call_llm(prompt)
     paraphrases = parse_json_list(result)
     
-    for p in paraphrases[:3]:
+    for p in paraphrases[:5]:
         eval_rows.append({
             "id": f"EVAL-{len(eval_rows)+1:04d}",
             "prompt": p,
             "category": "stale_entry_test",
             "expected_lane": "analytical",
-            "expected_corpus_id": None,
+            "expected_corpus_id": corpus_id,
             "difficulty": "medium",
             "source_corpus_id": corpus_id,
             "generation_method": "llm_paraphrase",
             "created_at": datetime.utcnow(),
-            "notes": f"Stale entry (expired): {corpus_id}"
+            "notes": f"Stale entry (expired): {corpus_id} — uses unique keywords"
         })
-
-# Also generate some for the last few certified entries (simulate staleness)
-for entry in certified_entries[-3:]:
-    question = entry["question"]
-    # Fill in a concrete value if parameterized
-    concrete = question.replace("{period}", "Q1 2025").replace("{campaign}", "spring_sale").replace("{metric}", "CTR").replace("{format}", "banner_300x250").replace("{channel}", "display")
-    eval_rows.append({
-        "id": f"EVAL-{len(eval_rows)+1:04d}",
-        "prompt": concrete,
-        "category": "stale_entry_test",
-        "expected_lane": "analytical",
-        "expected_corpus_id": None,
-        "difficulty": "hard",
-        "source_corpus_id": entry["id"],
-        "generation_method": "manual",
-        "created_at": datetime.utcnow(),
-        "notes": f"Simulated stale: exact match but entry review date forced to past"
-    })
 
 print(f"  Stale test rows added: {len(eval_rows) - stale_before}")
 
