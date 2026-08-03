@@ -17,6 +17,14 @@ resources:
           default: bannerhealth
 
       tasks:
+        - task_key: grant_app_permissions
+          description: 'Grant CAN_USE, CAN_QUERY, USE CATALOG, USE SCHEMA, SELECT to the app service principal'
+          notebook_task:
+            notebook_path: ../notebooks/grant_permissions.py
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+
         - task_key: create_schema_and_tables
           description: 'Create Delta tables for corpus, query history, and review queue (DDL only, no data)'
           notebook_task:

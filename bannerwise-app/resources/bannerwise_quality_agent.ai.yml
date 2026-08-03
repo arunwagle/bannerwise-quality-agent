@@ -1,36 +1,37 @@
 # ==============================================================================
 # Bannerwise Quality Agent — AI Resources (Vector Search)
-# Deploys the Vector Search endpoint and Delta Sync index for the confidence gate.
+# DISABLED: These resources already exist and are managed outside the bundle.
+# Re-enable after running: databricks bundle deployment bind ... from local terminal
 # ==============================================================================
 
-resources:
-  vector_search_endpoints:
-    bannerwise_vs_endpoint:
-      name: 'bannerwise-vs-endpoint'
-      endpoint_type: STANDARD
-
-  vector_search_indexes:
-    certified_qa_index:
-      name: 'aw_serverless_stable_catalog.bannerhealth.certified_qa_index'
-      endpoint_name: 'bannerwise-vs-endpoint'
-      index_type: DELTA_SYNC
-      primary_key: 'id'
-
-      delta_sync_index_spec:
-        source_table: 'aw_serverless_stable_catalog.bannerhealth.certified_qa_corpus'
-        pipeline_type: TRIGGERED
-
-        embedding_source_columns:
-          - name: 'question'
-            embedding_model_endpoint_name: 'databricks-bge-large-en'
-
-        columns_to_sync:
-          - 'id'
-          - 'question'
-          - 'parameterized_sql'
-          - 'answer_template'
-          - 'parameters'
-          - 'status'
-          - 'certified_by'
-          - 'certified_date'
-          - 'next_review_date'
+# resources:
+#   vector_search_endpoints:
+#     bannerwise_vs_endpoint:
+#       name: 'bannerwise-vs-endpoint'
+#       endpoint_type: STANDARD
+#
+#   vector_search_indexes:
+#     certified_qa_index:
+#       name: 'aw_serverless_stable_catalog.bannerhealth.certified_qa_index'
+#       endpoint_name: 'bannerwise-vs-endpoint'
+#       index_type: DELTA_SYNC
+#       primary_key: 'id'
+#
+#       delta_sync_index_spec:
+#         source_table: 'aw_serverless_stable_catalog.bannerhealth.certified_qa_corpus'
+#         pipeline_type: TRIGGERED
+#
+#         embedding_source_columns:
+#           - name: 'question'
+#             embedding_model_endpoint_name: 'databricks-bge-large-en'
+#
+#         columns_to_sync:
+#           - 'id'
+#           - 'question'
+#           - 'parameterized_sql'
+#           - 'answer_template'
+#           - 'parameters'
+#           - 'status'
+#           - 'certified_by'
+#           - 'certified_date'
+#           - 'next_review_date'
