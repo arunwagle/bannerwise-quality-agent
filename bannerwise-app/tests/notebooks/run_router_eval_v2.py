@@ -307,6 +307,7 @@ def _create_eval_function(bc_token, bc_host, vs_index, vs_top_k, judge_model,
 
 def _single_judge(w_exec, judge_model: str, prompt: str, template: str) -> str:
     """Single binary judge call via SDK."""
+    from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
     judge_prompt = f"""You are an intent matching judge. Determine if the user question asks the SAME thing as the certified question template.
 
 IMPORTANT: The certified question may contain parameter placeholders in curly braces like {{period}}, {{campaign}}, {{metric}}.
@@ -330,7 +331,7 @@ Answer with ONLY one word: MATCH or NO_MATCH"""
     try:
         response = w_exec.serving_endpoints.query(
             name=judge_model,
-            messages=[{"role": "user", "content": judge_prompt}],
+            messages=[ChatMessage(role=ChatMessageRole.USER, content=judge_prompt)],
             temperature=0.0,
             max_tokens=10,
         )
@@ -346,6 +347,7 @@ def _batch_judge(w_exec, judge_model: str, batch: List[Tuple]) -> List[str]:
     Sends up to JUDGE_BATCH_SIZE pairs in one request.
     Returns a list of verdicts (MATCH/NO_MATCH) in order.
     """
+    from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
     # Build a batch prompt with numbered pairs
     pairs_text = ""
     for i, (eval_id, prompt, candidate, _) in enumerate(batch, 1):
@@ -375,7 +377,7 @@ Answer ONLY with the numbered verdicts, nothing else."""
     try:
         response = w_exec.serving_endpoints.query(
             name=judge_model,
-            messages=[{"role": "user", "content": batch_prompt}],
+            messages=[ChatMessage(role=ChatMessageRole.USER, content=batch_prompt)],
             temperature=0.0,
             max_tokens=50,
         )
@@ -411,6 +413,7 @@ Answer ONLY with the numbered verdicts, nothing else."""
 
 from databricks.sdk import WorkspaceClient as _WC
 from databricks.sdk.config import Config as _Config
+from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
 
 # Quick validation on driver
 _w = _WC(config=_Config(host=_driver_host, token=_driver_token))

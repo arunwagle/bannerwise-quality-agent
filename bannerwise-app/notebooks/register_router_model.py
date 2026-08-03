@@ -208,9 +208,10 @@ Certified template: "{row['question']}"
 Answer with ONLY one word: MATCH or NO_MATCH"""
 
         try:
+            from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
             response = w.serving_endpoints.query(
                 name=self.judge_model,
-                messages=[{"role": "user", "content": judge_prompt}],
+                messages=[ChatMessage(role=ChatMessageRole.USER, content=judge_prompt)],
                 temperature=0.0,
                 max_tokens=10,
             )
