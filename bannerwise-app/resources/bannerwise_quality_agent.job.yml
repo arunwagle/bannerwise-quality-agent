@@ -79,6 +79,10 @@ resources:
           default: Small
         - name: scale_to_zero
           default: 'true'
+        - name: rate_limit_calls
+          default: '100'
+        - name: rate_limit_period
+          default: minute
 
       tasks:
         - task_key: run_router_agent
@@ -139,6 +143,19 @@ resources:
               endpoint_name: '{{job.parameters.endpoint_name}}'
               workload_size: '{{job.parameters.workload_size}}'
               scale_to_zero: '{{job.parameters.scale_to_zero}}'
+
+        - task_key: configure_ai_gateway
+          description: 'Enable inference tables, usage tracking, and rate limits via AI Gateway'
+          depends_on:
+            - task_key: deploy_serving_endpoint
+          notebook_task:
+            notebook_path: ../notebooks/configure_ai_gateway
+            base_parameters:
+              endpoint_name: '{{job.parameters.endpoint_name}}'
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+              rate_limit_calls: '{{job.parameters.rate_limit_calls}}'
+              rate_limit_period: '{{job.parameters.rate_limit_period}}'
 
       queue:
         enabled: true
