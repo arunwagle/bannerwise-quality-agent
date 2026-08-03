@@ -17,18 +17,10 @@ resources:
           default: bannerhealth
 
       tasks:
-        - task_key: grant_app_permissions
-          description: 'Grant CAN_USE, CAN_QUERY, USE CATALOG, USE SCHEMA, SELECT to the app service principal'
-          notebook_task:
-            notebook_path: ../notebooks/grant_permissions.py
-            base_parameters:
-              catalog_name: '{{job.parameters.catalog_name}}'
-              schema_name: '{{job.parameters.schema_name}}'
-
         - task_key: create_schema_and_tables
           description: 'Create Delta tables for corpus, query history, and review queue (DDL only, no data)'
           notebook_task:
-            notebook_path: ../notebooks/create_tables.py
+            notebook_path: ../notebooks/data/create_tables.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -38,10 +30,67 @@ resources:
           depends_on:
             - task_key: create_schema_and_tables
           notebook_task:
-            notebook_path: ../notebooks/create_synthetic_data.py
+            notebook_path: ../notebooks/data/create_synthetic_data.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
+
+      queue:
+        enabled: true
+
+    # ─────────────────────────────────────────────────────────────
+    # Setup Access Job — Configures app SP connectivity
+    # ─────────────────────────────────────────────────────────────
+    setup_access_job:
+      name: 'bannerwise-quality-agent-access'
+      description: 'Configures app service principal connectivity to workspace resources'
+      tags:
+        project: bannerwise-quality-agent
+        purpose: access-setup
+
+      parameters:
+        - name: catalog_name
+          default: aw_serverless_stable_catalog
+        - name: schema_name
+          default: bannerhealth
+        - name: app_sp_name
+          default: 'app-3hjyzw aw-bannerwise-quality-agent'
+        - name: sql_warehouse_id
+          default: '2d8e531640ffa469'
+        - name: serving_endpoint_name
+          default: 'bannerwise-quality-router'
+        - name: vs_endpoint_name
+          default: 'bannerwise-vs-endpoint'
+        - name: llm_endpoint_name
+          default: 'databricks-meta-llama-3-3-70b-instruct'
+
+      tasks:
+        - task_key: configure_uc_access
+          description: 'Setup app connectivity to Unity Catalog resources'
+          notebook_task:
+            notebook_path: ../notebooks/access/setup_uc_access.py
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+              app_sp_name: '{{job.parameters.app_sp_name}}'
+              sql_warehouse_id: '{{job.parameters.sql_warehouse_id}}'
+
+        - task_key: configure_vs_access
+          description: 'Setup app connectivity to Vector Search endpoint'
+          notebook_task:
+            notebook_path: ../notebooks/access/setup_vs_access.py
+            base_parameters:
+              app_sp_name: '{{job.parameters.app_sp_name}}'
+              vs_endpoint_name: '{{job.parameters.vs_endpoint_name}}'
+
+        - task_key: configure_endpoint_access
+          description: 'Setup app connectivity to model serving endpoints'
+          notebook_task:
+            notebook_path: ../notebooks/access/setup_endpoint_access.py
+            base_parameters:
+              app_sp_name: '{{job.parameters.app_sp_name}}'
+              serving_endpoint_name: '{{job.parameters.serving_endpoint_name}}'
+              llm_endpoint_name: '{{job.parameters.llm_endpoint_name}}'
 
       queue:
         enabled: true
@@ -76,7 +125,7 @@ resources:
           depends_on:
             - task_key: setup_certified_corpus
           notebook_task:
-            notebook_path: ../notebooks/create_vector_search_index.py
+            notebook_path: ../notebooks/vs/create_vector_search_index.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -137,7 +186,7 @@ resources:
         - task_key: run_router_agent
           description: 'Fast-fail smoke test — validates router runs without errors'
           notebook_task:
-            notebook_path: ../notebooks/router_agent.py
+            notebook_path: ../notebooks/agent/router_agent.py
             base_parameters:
               prompt: '{{job.parameters.prompt}}'
               catalog_name: '{{job.parameters.catalog_name}}'
@@ -170,7 +219,7 @@ resources:
           depends_on:
             - task_key: run_eval
           notebook_task:
-            notebook_path: ../notebooks/register_router_model.py
+            notebook_path: ../notebooks/agent/register_router_model.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -184,7 +233,7 @@ resources:
           depends_on:
             - task_key: register_model
           notebook_task:
-            notebook_path: ../notebooks/deploy_serving_endpoint.py
+            notebook_path: ../notebooks/agent/deploy_serving_endpoint.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -199,7 +248,7 @@ resources:
           depends_on:
             - task_key: deploy_serving_endpoint
           notebook_task:
-            notebook_path: ../notebooks/configure_ai_gateway.py
+            notebook_path: ../notebooks/agent/configure_ai_gateway.py
             base_parameters:
               endpoint_name: '{{job.parameters.endpoint_name}}'
               catalog_name: '{{job.parameters.catalog_name}}'
@@ -257,7 +306,7 @@ resources:
         - task_key: generate_eval_dataset
           description: 'LLM-powered eval dataset generation from certified corpus'
           notebook_task:
-            notebook_path: ../notebooks/generate_eval_dataset.py
+            notebook_path: ../notebooks/eval/generate_eval_dataset.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -273,7 +322,7 @@ resources:
           depends_on:
             - task_key: generate_eval_dataset
           notebook_task:
-            notebook_path: ../notebooks/run_router_eval_v2.py
+            notebook_path: ../notebooks/eval/run_router_eval_v2.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
@@ -288,7 +337,7 @@ resources:
           depends_on:
             - task_key: run_router_eval
           notebook_task:
-            notebook_path: ../notebooks/check_eval_thresholds.py
+            notebook_path: ../notebooks/eval/check_eval_thresholds.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'

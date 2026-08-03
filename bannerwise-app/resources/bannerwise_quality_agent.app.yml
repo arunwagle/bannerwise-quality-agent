@@ -1,16 +1,13 @@
-# DISABLED: App resource already exists and is managed outside the bundle.
-# Re-enable after running: databricks bundle deployment bind ... from local terminal
-#
-# resources:
-#   apps:
-#     bannerwise_quality_agent:
-#       name: 'aw-bannerwise-quality-agent'
-#       source_code_path: ../apps
-#       description: 'Bannerwise Quality Agent — AI-powered banner quality assessment app'
-#
-#       user_api_scopes:
-#         - 'files'
-#
-#       permissions:
-#         - level: CAN_USE
-#           group_name: users
+resources:
+  apps:
+    bannerwise_quality_agent:
+      name: '${bundle.target}-bw-quality-agent'
+      source_code_path: ../apps
+      description: 'Bannerwise Quality Agent — AI-powered banner quality assessment app'
+
+      user_api_scopes:
+        - 'files'
+
+      permissions:
+        - level: CAN_USE
+          group_name: users
