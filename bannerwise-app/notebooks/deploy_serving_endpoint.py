@@ -39,6 +39,9 @@ ENDPOINT_NAME = dbutils.widgets.get("endpoint_name")
 WORKLOAD_SIZE = dbutils.widgets.get("workload_size")
 SCALE_TO_ZERO = dbutils.widgets.get("scale_to_zero").lower() == "true"
 
+dbutils.widgets.text("app_service_principal", "app-3hjyzw aw-bannerwise-quality-agent")
+APP_SP_NAME = dbutils.widgets.get("app_service_principal")
+
 FULL_MODEL_NAME = f"{CATALOG}.{SCHEMA}.{MODEL_NAME}"
 
 print(f"Endpoint: {ENDPOINT_NAME}")
@@ -116,6 +119,34 @@ except Exception as e:
         print(f"✓ Endpoint created with champion version {champion_version}")
     else:
         raise
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Grant App Permissions
+
+# COMMAND ----------
+
+from databricks.sdk.service.iam import AccessControlRequest
+from databricks.sdk.service.serving import ServingEndpointPermissionLevel
+
+# Grant CAN_QUERY to the app's service principal
+if APP_SP_NAME:
+    try:
+        endpoint_obj = w.serving_endpoints.get(ENDPOINT_NAME)
+        w.serving_endpoints.update_permissions(
+            serving_endpoint_id=endpoint_obj.id,
+            access_control_list=[
+                AccessControlRequest(
+                    service_principal_name=APP_SP_NAME,
+                    permission_level=ServingEndpointPermissionLevel.CAN_QUERY,
+                )
+            ]
+        )
+        print(f"\u2713 Granted CAN_QUERY to '{APP_SP_NAME}'")
+    except Exception as e:
+        print(f"\u26a0 Permission grant failed (endpoint may not be ready): {e}")
+        print("  Grant manually via UI: Serving Endpoints → Permissions")
 
 # COMMAND ----------
 
