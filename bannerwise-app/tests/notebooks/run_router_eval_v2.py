@@ -97,8 +97,8 @@ _driver_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext(
 _driver_host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().get()
 
 # Broadcast credentials to all executors
-_bc_token = spark.sparkContext.broadcast(_driver_token)
-_bc_host = spark.sparkContext.broadcast(_driver_host)
+# (credentials passed via closure — no broadcast needed on serverless)
+# (Spark Connect serializes closure variables automatically)
 
 print(f"Auth captured and broadcast to executors")
 print(f"  Host: {_driver_host}")
