@@ -123,7 +123,7 @@ import pandas as pd
 from pyspark.sql.types import *
 
 
-def _create_eval_function(bc_token, bc_host, vs_index, vs_top_k, judge_model,
+def _create_eval_function(driver_token, driver_host, vs_index, vs_top_k, judge_model,
                           confidence_threshold, vs_short_circuit_threshold, judge_batch_size):
     """Factory that returns a mapInPandas-compatible function with captured config.
     
@@ -142,9 +142,7 @@ def _create_eval_function(bc_token, bc_host, vs_index, vs_top_k, judge_model,
         from databricks.sdk.config import Config
 
         # Initialize SDK with broadcast credentials
-        token = bc_token.value
-        host = bc_host.value
-        config = Config(host=host, token=token)
+        config = Config(host=driver_host, token=driver_token)
         w_exec = WorkspaceClient(config=config)
 
         for pdf in pdf_iterator:
@@ -477,8 +475,8 @@ output_schema = StructType([
 
 # Create the eval function with captured config
 eval_fn = _create_eval_function(
-    bc_token=_bc_token,
-    bc_host=_bc_host,
+    driver_token=_driver_token,
+    driver_host=_driver_host,
     vs_index=VS_INDEX,
     vs_top_k=VS_TOP_K,
     judge_model=JUDGE_MODEL,
