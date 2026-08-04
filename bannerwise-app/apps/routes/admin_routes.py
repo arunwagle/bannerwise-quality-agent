@@ -1,7 +1,7 @@
 """Admin routes — configuration and corpus management."""
 
 from flask import Blueprint, render_template, request, jsonify
-from services.mock_corpus_service import get_corpus_stats
+from services.corpus_service import get_draft_stats as get_corpus_stats
 
 admin_bp = Blueprint('admin', __name__)
 
