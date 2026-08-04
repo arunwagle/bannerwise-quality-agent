@@ -1,36 +1,29 @@
 {% extends "layout.html" %}
-{% block title %}Corpus — Bannerwise Quality Agent{% endblock %}
+{% block title %}Review — Bannerwise Quality Agent{% endblock %}
 
 {% block content %}
 <div class="page-corpus">
     <div class="page-header">
-        <h2 class="page-title">Certified Q&A Corpus</h2>
+        <h2 class="page-title">SME Review Queue</h2>
         <div class="search-bar">
             <input type="text" id="corpusSearch" class="search-input" placeholder="Search questions..." oninput="searchCorpus()">
         </div>
     </div>
 
-    <!-- Status Filter Pills -->
-    <div class="filter-pills">
-        <button class="pill active" data-status="all" onclick="filterCorpus('all')">All</button>
-        <button class="pill" data-status="certified" onclick="filterCorpus('certified')">Certified</button>
-        <button class="pill" data-status="draft" onclick="filterCorpus('draft')">Draft</button>
-        <button class="pill" data-status="expired" onclick="filterCorpus('expired')">Expired</button>
-    </div>
-
     <!-- Stats -->
     <div id="corpusStats" class="stats-bar"></div>
 
-    <!-- Corpus Table -->
+    <!-- Review Table -->
     <div class="table-wrapper">
         <table class="data-table" id="corpusTable">
             <thead>
                 <tr>
                     <th>ID</th>
                     <th>Question</th>
-                    <th>Status</th>
-                    <th>Certified By</th>
-                    <th>Next Review</th>
+                    <th>SQL Query</th>
+                    <th>Submitted By</th>
+                    <th>Created</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody id="corpusTableBody">
@@ -47,6 +40,6 @@
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', () => loadCorpus());
+document.addEventListener('DOMContentLoaded', () => loadReviewQueue());
 </script>
 {% endblock %}
