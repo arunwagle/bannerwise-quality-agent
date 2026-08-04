@@ -1,7 +1,7 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Create Data Model Tables
-# MAGIC 
+# MAGIC
 # MAGIC Creates the Bannerwise Quality Agent tables if they do not already exist.
 
 # COMMAND ----------
@@ -49,6 +49,31 @@ TBLPROPERTIES (
 )
 """)
 print("certified_qa_corpus created")
+
+# COMMAND ----------
+
+# DBTITLE 1,1b. Certified QA Corpus Draft (Pending Certification)
+# MAGIC %md
+# MAGIC ## 1b. Certified QA Corpus Draft
+# MAGIC Staging table for entries pending SME certification. Once certified, entries move to `certified_qa_corpus` and auto-sync to Vector Search.
+
+# COMMAND ----------
+
+# DBTITLE 1,Create draft table
+spark.sql(f"""
+CREATE TABLE IF NOT EXISTS {catalog_name}.{schema_name}.certified_qa_corpus_draft (
+    id                  STRING        NOT NULL  COMMENT 'Draft entry identifier (e.g. DRAFT-A1B2C3D4)',
+    question            STRING        NOT NULL  COMMENT 'Proposed certified question text',
+    parameterized_sql   STRING        NOT NULL  COMMENT 'Proposed parameterized SQL template',
+    answer_template     STRING        NOT NULL  COMMENT 'Proposed answer template',
+    parameters          STRING                  COMMENT 'JSON array of parameter names',
+    submitted_by        STRING                  COMMENT 'Who submitted this draft for certification',
+    original_prompt     STRING                  COMMENT 'The original user prompt that triggered this draft',
+    created_at          TIMESTAMP               COMMENT 'When the draft was submitted'
+)
+COMMENT 'Staging table for Q&A entries pending SME certification. Certified entries are promoted to certified_qa_corpus.'
+""")
+print("certified_qa_corpus_draft created")
 
 # COMMAND ----------
 
@@ -104,6 +129,7 @@ print("sme_review_queue created")
 
 # COMMAND ----------
 
+# DBTITLE 1,Summary
 print(f"\nAll tables created in {catalog_name}.{schema_name}")
-for table in ["certified_qa_corpus", "query_history", "sme_review_queue"]:
+for table in ["certified_qa_corpus", "certified_qa_corpus_draft", "query_history", "sme_review_queue"]:
     print(f"  {catalog_name}.{schema_name}.{table}")
