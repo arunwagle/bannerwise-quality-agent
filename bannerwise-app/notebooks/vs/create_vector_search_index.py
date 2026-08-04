@@ -51,8 +51,14 @@ assert row_count > 0, f"Source table {SOURCE_TABLE} is empty — cannot create i
 
 # COMMAND ----------
 
+# DBTITLE 1,Create or sync the Delta Sync index
 from databricks.sdk import WorkspaceClient
-import time
+from databricks.sdk.service.vectorsearch import (
+    DeltaSyncVectorIndexSpecRequest,
+    EmbeddingSourceColumn,
+    PipelineType,
+    VectorIndexType,
+)
 
 w = WorkspaceClient()
 
@@ -68,7 +74,7 @@ try:
     print(f"  Status: {existing.status.ready}")
     print(f"  Syncing index...")
     w.vector_search_indexes.sync_index(INDEX_NAME)
-    print(f"  Sync triggered.")
+    print(f"  \u2713 Sync triggered.")
 except Exception as e:
     if "NOT_FOUND" in str(e) or "does not exist" in str(e).lower():
         print(f"Creating new index: {INDEX_NAME}")
@@ -76,20 +82,20 @@ except Exception as e:
             name=INDEX_NAME,
             endpoint_name=VS_ENDPOINT,
             primary_key="id",
-            index_type="DELTA_SYNC",
-            delta_sync_index_spec={
-                "source_table": SOURCE_TABLE,
-                "pipeline_type": "TRIGGERED",
-                "embedding_source_columns": [
-                    {
-                        "name": "question",
-                        "embedding_model_endpoint_name": EMBEDDING_MODEL,
-                    }
+            index_type=VectorIndexType.DELTA_SYNC,
+            delta_sync_index_spec=DeltaSyncVectorIndexSpecRequest(
+                source_table=SOURCE_TABLE,
+                pipeline_type=PipelineType.TRIGGERED,
+                embedding_source_columns=[
+                    EmbeddingSourceColumn(
+                        name="question",
+                        embedding_model_endpoint_name=EMBEDDING_MODEL,
+                    )
                 ],
-                "columns_to_sync": COLUMNS_TO_SYNC,
-            },
+                columns_to_sync=COLUMNS_TO_SYNC,
+            ),
         )
-        print(f"Index creation initiated.")
+        print(f"\u2713 Index creation initiated (runs async — no wait).")
     else:
         raise
 
@@ -100,23 +106,17 @@ except Exception as e:
 
 # COMMAND ----------
 
-MAX_WAIT_SEC = 600  # 10 minutes
-POLL_INTERVAL = 15
+# DBTITLE 1,Check index status (no waiting)
+# Check current status without waiting (index syncs asynchronously)
+import time
+time.sleep(5)  # brief pause for API consistency
 
-print(f"Waiting for index to be ready (max {MAX_WAIT_SEC}s)...")
-start = time.time()
-while time.time() - start < MAX_WAIT_SEC:
-    idx = w.vector_search_indexes.get_index(INDEX_NAME)
-    ready = idx.status.ready
-    if ready:
-        print(f"\nIndex is READY ({int(time.time()-start)}s)")
-        break
-    print(".", end="", flush=True)
-    time.sleep(POLL_INTERVAL)
-else:
-    elapsed = int(time.time() - start)
-    print(f"\nWARNING: Index not ready after {elapsed}s — may still be syncing")
-    print("  The index will become available shortly. Continuing...")
+idx = w.vector_search_indexes.get_index(INDEX_NAME)
+print(f"Index: {idx.name}")
+print(f"  Ready: {idx.status.ready}")
+if not idx.status.ready:
+    print(f"  Index is syncing asynchronously — will be ready in a few minutes.")
+    print(f"  No need to wait here. Run the router_agent_job after the index is ONLINE.")
 
 # COMMAND ----------
 
