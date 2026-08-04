@@ -99,28 +99,14 @@ Output: {{"period": "Q1 2025"}}
 
 Return ONLY the JSON object, no explanation."""
 
-    import requests
-    host = os.environ.get("DATABRICKS_HOST", "")
-    if not host:
-        # Get from SDK config
-        host = w.config.host
-
-    # Use SDK's authenticate() method — works in all environments (Apps, notebooks, local)
-    headers = w.config.authenticate()
-    headers["Content-Type"] = "application/json"
-
-    resp = requests.post(
-        f"{host}/serving-endpoints/{LLM_ENDPOINT}/invocations",
-        headers=headers,
-        json={
-            "messages": [{"role": "user", "content": extraction_prompt}],
-            "temperature": 0.0,
-            "max_tokens": 200,
-        },
-        timeout=30,
+    # Use SDK to call LLM endpoint (handles auth and URL automatically)
+    resp = w.serving_endpoints.query(
+        name=LLM_ENDPOINT,
+        messages=[{"role": "user", "content": extraction_prompt}],
+        temperature=0.0,
+        max_tokens=200,
     )
-    resp.raise_for_status()
-    llm_response = resp.json()["choices"][0]["message"]["content"].strip()
+    llm_response = resp.choices[0].message.content.strip()
 
     # Parse JSON from LLM response
     try:
