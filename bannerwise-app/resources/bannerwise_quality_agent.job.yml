@@ -408,3 +408,45 @@ resources:
 
       queue:
         enabled: true
+
+    # ─────────────────────────────────────────────────────────────
+    # Genie Space Job — Creates/updates Genie Space for analytics
+    # ─────────────────────────────────────────────────────────────
+    genie_space_job:
+      name: 'bannerwise-quality-agent-genie-space'
+      description: 'Creates or updates the Bannerwise Analytics Genie Space with sample questions, instructions, and benchmarks'
+      tags:
+        project: bannerwise-quality-agent
+        purpose: genie-space
+
+      parameters:
+        - name: catalog_name
+          default: ${var.catalog_name}
+        - name: schema_name
+          default: ${var.schema_name}
+        - name: sql_warehouse_id
+          default: ${var.sql_warehouse_id}
+        - name: space_id
+          default: ''
+
+      tasks:
+        - task_key: build_genie_config
+          description: 'Generate serialized_space JSON with instructions, questions, and benchmarks'
+          notebook_task:
+            notebook_path: ../notebooks/genie/build_genie_config.py
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+              sql_warehouse_id: '{{job.parameters.sql_warehouse_id}}'
+
+        - task_key: create_genie_space
+          description: 'Call Genie Space API to create or update the space'
+          depends_on:
+            - task_key: build_genie_config
+          notebook_task:
+            notebook_path: ../notebooks/genie/create_genie_space.py
+            base_parameters:
+              space_id: '{{job.parameters.space_id}}'
+
+      queue:
+        enabled: true
