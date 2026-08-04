@@ -168,8 +168,10 @@ corpus_schema = StructType([
 ])
 
 corpus_df = spark.createDataFrame(corpus_rows, schema=corpus_schema)
-corpus_df.write.mode("overwrite").saveAsTable(f"{catalog_name}.{schema_name}.certified_qa_corpus")
-print(f"✓ Wrote {corpus_df.count()} rows to certified_qa_corpus")
+# Truncate first to avoid duplicates, then insert (preserves table properties + CDF)
+spark.sql(f"TRUNCATE TABLE {catalog_name}.{schema_name}.certified_qa_corpus")
+corpus_df.write.mode("append").saveAsTable(f"{catalog_name}.{schema_name}.certified_qa_corpus")
+print(f"✓ Wrote {corpus_df.count()} rows to certified_qa_corpus (replaced)")
 
 # COMMAND ----------
 
@@ -225,8 +227,9 @@ history_df = (
     .drop("row_id")
 )
 
-history_df.write.mode("overwrite").saveAsTable(f"{catalog_name}.{schema_name}.query_history")
-print(f"✓ Wrote {history_df.count()} rows to query_history")
+spark.sql(f"TRUNCATE TABLE {catalog_name}.{schema_name}.query_history")
+history_df.write.mode("append").saveAsTable(f"{catalog_name}.{schema_name}.query_history")
+print(f"✓ Wrote {history_df.count()} rows to query_history (replaced)")
 
 # COMMAND ----------
 
@@ -288,8 +291,9 @@ review_df = (
     .withColumn("notes", F.when(F.col("status") == "pending", None).otherwise(F.col("notes")))
 )
 
-review_df.write.mode("overwrite").saveAsTable(f"{catalog_name}.{schema_name}.sme_review_queue")
-print(f"✓ Wrote {review_df.count()} rows to sme_review_queue")
+spark.sql(f"TRUNCATE TABLE {catalog_name}.{schema_name}.sme_review_queue")
+review_df.write.mode("append").saveAsTable(f"{catalog_name}.{schema_name}.sme_review_queue")
+print(f"✓ Wrote {review_df.count()} rows to sme_review_queue (replaced)")
 
 # COMMAND ----------
 
