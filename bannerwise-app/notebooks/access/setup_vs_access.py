@@ -34,6 +34,11 @@ print(f"VS Endpoint: {VS_ENDPOINT}")
 # COMMAND ----------
 
 # DBTITLE 1,Grant VS endpoint access to app SP
+# Resolve VS endpoint name to UUID (permissions API requires UUID)
+ep = w.vector_search_endpoints.get_endpoint(VS_ENDPOINT)
+VS_ENDPOINT_ID = ep.id
+print(f"  Resolved '{VS_ENDPOINT}' -> UUID: {VS_ENDPOINT_ID}")
+
 # Grant CAN_USE on the VS endpoint
 payload = {
     "access_control_list": [
@@ -46,7 +51,7 @@ payload = {
 
 w.api_client.do(
     "PATCH",
-    f"/api/2.0/permissions/vector-search-endpoints/{VS_ENDPOINT}",
+    f"/api/2.0/permissions/vector-search-endpoints/{VS_ENDPOINT_ID}",
     body=payload,
 )
 print(f"✓ Granted CAN_USE on VS endpoint '{VS_ENDPOINT}' to {APP_SP}")
@@ -57,7 +62,7 @@ print(f"✓ Granted CAN_USE on VS endpoint '{VS_ENDPOINT}' to {APP_SP}")
 # Verify the permissions were applied
 resp = w.api_client.do(
     "GET",
-    f"/api/2.0/permissions/vector-search-endpoints/{VS_ENDPOINT}",
+    f"/api/2.0/permissions/vector-search-endpoints/{VS_ENDPOINT_ID}",
 )
 acl = resp.get("access_control_list", [])
 for entry in acl:
