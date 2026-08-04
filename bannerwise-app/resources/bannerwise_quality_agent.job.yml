@@ -398,5 +398,16 @@ resources:
               schema_name: '{{job.parameters.schema_name}}'
               model_name: '{{job.parameters.model_name}}'
 
+        - task_key: cleanup_schema
+          description: 'Drop schema and all tables within it'
+          depends_on:
+            - task_key: cleanup_vector_index
+            - task_key: cleanup_registered_model
+          notebook_task:
+            notebook_path: ../notebooks/data/cleanup_schema.py
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+
       queue:
         enabled: true
