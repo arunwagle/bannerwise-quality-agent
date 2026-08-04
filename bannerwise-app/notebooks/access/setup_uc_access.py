@@ -56,25 +56,23 @@ print(f"✓ Granted SELECT on {CATALOG}.{SCHEMA} to {APP_SP}")
 
 # DBTITLE 1,Grant SQL warehouse CAN_USE
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.sql import SetWorkspaceWarehouseConfigRequestSecurityPolicy
 
 w = WorkspaceClient()
 
-# Get current warehouse permissions
-current = w.warehouses.get_permission_levels(warehouse_id=WAREHOUSE_ID)
-print(f"Warehouse {WAREHOUSE_ID} permission levels: {[pl.permission_level.value for pl in current.permission_levels]}")
-
-# Set CAN_USE for the app SP
-from databricks.sdk.service.iam import PermissionLevel
-
-w.warehouses.update_permissions(
-    warehouse_id=WAREHOUSE_ID,
-    access_control_list=[
+# Grant CAN_USE on the SQL warehouse using the SDK's api_client
+payload = {
+    "access_control_list": [
         {
             "service_principal_name": APP_SP,
-            "all_permissions": [{"permission_level": "CAN_USE"}]
+            "all_permissions": [{"permission_level": "CAN_USE"}],
         }
     ]
+}
+
+w.api_client.do(
+    "PATCH",
+    f"/api/2.0/permissions/warehouses/{WAREHOUSE_ID}",
+    body=payload,
 )
 print(f"✓ Granted CAN_USE on warehouse {WAREHOUSE_ID} to {APP_SP}")
 

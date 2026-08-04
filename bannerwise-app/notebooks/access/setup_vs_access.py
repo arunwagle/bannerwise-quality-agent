@@ -28,10 +28,9 @@ print(f"VS Endpoint: {VS_ENDPOINT}")
 
 # DBTITLE 1,Grant VS endpoint access to app SP
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.catalog import (
-    SecurableType,
-    PermissionsChange,
-    Privilege,
+from databricks.sdk.service.iam import (
+    ObjectPermissions,
+    PermissionLevel,
 )
 
 w = WorkspaceClient()
@@ -42,21 +41,7 @@ assert sp_list, f"Service principal '{APP_SP}' not found"
 sp_id = sp_list[0].id
 print(f"Found SP: {APP_SP} (ID: {sp_id})")
 
-# Grant access to the Vector Search endpoint using the permissions API
-import requests
-
-token = w.config.authenticate()
-headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-host = w.config.host.rstrip("/")
-
-# Get existing permissions
-resp = requests.get(
-    f"{host}/api/2.0/permissions/vector-search-endpoints/{VS_ENDPOINT}",
-    headers=headers,
-)
-print(f"Current permissions status: {resp.status_code}")
-
-# Update permissions — grant CAN_USE to the SP
+# Grant CAN_USE on the VS endpoint using the SDK's api_client (avoids auth issues)
 payload = {
     "access_control_list": [
         {
@@ -66,30 +51,26 @@ payload = {
     ]
 }
 
-resp = requests.patch(
-    f"{host}/api/2.0/permissions/vector-search-endpoints/{VS_ENDPOINT}",
-    headers=headers,
-    json=payload,
+resp = w.api_client.do(
+    "PATCH",
+    f"/api/2.0/permissions/vector-search-endpoints/{VS_ENDPOINT}",
+    body=payload,
 )
-resp.raise_for_status()
 print(f"✓ Granted CAN_USE on VS endpoint '{VS_ENDPOINT}' to {APP_SP}")
 
 # COMMAND ----------
 
 # DBTITLE 1,Verify VS endpoint access
 # Verify the permissions were applied
-resp = requests.get(
-    f"{host}/api/2.0/permissions/vector-search-endpoints/{VS_ENDPOINT}",
-    headers=headers,
+resp = w.api_client.do(
+    "GET",
+    f"/api/2.0/permissions/vector-search-endpoints/{VS_ENDPOINT}",
 )
-if resp.status_code == 200:
-    acl = resp.json().get("access_control_list", [])
-    for entry in acl:
-        if entry.get("service_principal_name") == APP_SP:
-            perms = [p["permission_level"] for p in entry.get("all_permissions", [])]
-            print(f"✅ Verified: {APP_SP} has {perms} on {VS_ENDPOINT}")
-            break
-    else:
-        print(f"⚠️ Could not verify permissions for {APP_SP}")
+acl = resp.get("access_control_list", [])
+for entry in acl:
+    if entry.get("service_principal_name") == APP_SP:
+        perms = [p["permission_level"] for p in entry.get("all_permissions", [])]
+        print(f"✅ Verified: {APP_SP} has {perms} on {VS_ENDPOINT}")
+        break
 else:
-    print(f"⚠️ Could not read permissions: {resp.status_code}")
+    print(f"⚠️ Could not verify permissions for {APP_SP}")
