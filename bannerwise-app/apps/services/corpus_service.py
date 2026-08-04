@@ -178,7 +178,7 @@ def submit_draft(
     }
 
 
-def certify_entry(entry_id: str, certified_by: str) -> dict:
+def certify_entry(entry_id: str, certified_by: str, modified_sql: str = None) -> dict:
     """Certify a draft entry — moves it from draft table to certified table.
 
     The Vector Search index will auto-sync the new certified entry.
@@ -186,6 +186,7 @@ def certify_entry(entry_id: str, certified_by: str) -> dict:
     Args:
         entry_id: The draft entry ID to certify.
         certified_by: Email of the certifying SME.
+        modified_sql: (optional) Modified SQL to use instead of the draft's SQL.
 
     Returns:
         The certified entry dict.
@@ -197,6 +198,9 @@ def certify_entry(entry_id: str, certified_by: str) -> dict:
     if not draft:
         raise ValueError(f"Draft entry not found: {entry_id}")
 
+    # Use modified SQL if provided, otherwise use the draft's SQL
+    final_sql = modified_sql if modified_sql else draft["parameterized_sql"]
+
     # 2. Generate a new certified ID
     certified_id = f"QA-{uuid.uuid4().hex[:4].upper()}"
     now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
@@ -205,7 +209,7 @@ def certify_entry(entry_id: str, certified_by: str) -> dict:
 
     # Escape strings
     question_escaped = draft["question"].replace("'", "''")
-    sql_escaped = draft["parameterized_sql"].replace("'", "''")
+    sql_escaped = final_sql.replace("'", "''")
     template_escaped = draft["answer_template"].replace("'", "''")
     certified_by_escaped = certified_by.replace("'", "''")
 

@@ -217,21 +217,79 @@ async function showReviewDetail(entryId) {
     if (!panel) return;
 
     panel.innerHTML = `
-        <h3>${escapeHtml(entry.question || '')}</h3>
-        <dl class="provenance-details">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <h3 style="margin:0">${escapeHtml(entry.question || '')}</h3>
+            <button class="btn btn-sm" onclick="closeReviewDetail()" title="Close">&times; Close</button>
+        </div>
+        <dl class="provenance-details" style="margin-top:1rem">
             <dt>ID</dt><dd>${entry.id}</dd>
             <dt>Original Prompt</dt><dd>${escapeHtml(entry.original_prompt || entry.question || '')}</dd>
-            <dt>SQL Query</dt><dd><pre style="background:#f5f5f5;padding:0.5rem;border-radius:4px;overflow-x:auto"><code>${escapeHtml(entry.parameterized_sql || 'N/A')}</code></pre></dd>
-            <dt>Answer</dt><dd>${formatAnswer(entry.answer_template || 'N/A')}</dd>
+            <dt>SQL Query</dt><dd>
+                <textarea id="reviewSqlEditor" style="width:100%;min-height:100px;font-family:monospace;font-size:0.85em;padding:0.5rem;border:1px solid #ddd;border-radius:4px;resize:vertical">${escapeHtml(entry.parameterized_sql || '')}</textarea>
+            </dd>
+            <dt>Answer</dt><dd><div id="reviewAnswer">${formatAnswer(entry.answer_template || 'N/A')}</div></dd>
             <dt>Submitted By</dt><dd>${entry.submitted_by || '—'}</dd>
             <dt>Created</dt><dd>${entry.created_at || '—'}</dd>
         </dl>
-        <div style="margin-top:1rem">
-            <button class="btn btn-success" onclick="certifyEntry('${entry.id}')">Certify</button>
+        <div id="reviewQueryResult" class="hidden" style="margin:1rem 0;padding:0.75rem;background:#f0f8ff;border:1px solid #bee3f8;border-radius:4px"></div>
+        <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="runModifiedQuery('${entry.id}')">Run Modified Query</button>
+            <button class="btn btn-success" onclick="certifyWithSql('${entry.id}')">Certify</button>
             <button class="btn btn-danger" onclick="rejectEntry('${entry.id}')">Reject</button>
         </div>
     `;
     panel.classList.remove('hidden');
+}
+
+function closeReviewDetail() {
+    const panel = document.getElementById('corpusDetail');
+    if (panel) panel.classList.add('hidden');
+}
+
+async function runModifiedQuery(entryId) {
+    const sql = document.getElementById('reviewSqlEditor')?.value;
+    if (!sql || !sql.trim()) {
+        alert('Please enter a SQL query to run.');
+        return;
+    }
+    const resultDiv = document.getElementById('reviewQueryResult');
+    resultDiv.classList.remove('hidden');
+    resultDiv.innerHTML = '<em>Running query...</em>';
+    try {
+        const resp = await apiPost('/api/corpus/run-query', { sql: sql.trim() });
+        if (resp.error) {
+            resultDiv.innerHTML = `<strong style="color:red">Error:</strong> ${escapeHtml(resp.error)}`;
+        } else {
+            const rows = resp.results || [];
+            if (rows.length === 0) {
+                resultDiv.innerHTML = '<em>Query returned no results.</em>';
+            } else {
+                const cols = Object.keys(rows[0]);
+                let html = '<table style="width:100%;font-size:0.85em;border-collapse:collapse">';
+                html += '<thead><tr>' + cols.map(c => `<th style="border-bottom:2px solid #ddd;padding:4px;text-align:left">${escapeHtml(c)}</th>`).join('') + '</tr></thead>';
+                html += '<tbody>' + rows.slice(0, 20).map(row =>
+                    '<tr>' + cols.map(c => `<td style="border-bottom:1px solid #eee;padding:4px">${escapeHtml(String(row[c] ?? ''))}</td>`).join('') + '</tr>'
+                ).join('') + '</tbody></table>';
+                if (rows.length > 20) html += `<em>Showing 20 of ${rows.length} rows</em>`;
+                resultDiv.innerHTML = html;
+            }
+        }
+    } catch (err) {
+        resultDiv.innerHTML = `<strong style="color:red">Error:</strong> ${escapeHtml(err.message)}`;
+    }
+}
+
+async function certifyWithSql(entryId) {
+    const sql = document.getElementById('reviewSqlEditor')?.value || '';
+    if (!confirm('Certify this entry with the current SQL query?')) return;
+    try {
+        await apiPost(`/api/corpus/certify/${entryId}`, { parameterized_sql: sql.trim() });
+        alert('\u2705 Entry certified successfully.');
+        loadReviewQueue();
+        closeReviewDetail();
+    } catch (err) {
+        alert('Failed to certify: ' + err.message);
+    }
 }
 
 async function certifyEntry(entryId) {

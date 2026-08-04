@@ -6,6 +6,7 @@ which auto-syncs to the Vector Search index.
 """
 
 import logging
+import os
 from flask import Blueprint, render_template, request, jsonify
 from services.corpus_service import (
     get_draft_entries,
@@ -15,6 +16,7 @@ from services.corpus_service import (
     certify_entry,
     reject_entry,
 )
+from databricks.sdk import WorkspaceClient
 
 logger = logging.getLogger(__name__)
 corpus_bp = Blueprint('corpus', __name__)
@@ -101,18 +103,61 @@ def api_corpus_certify(entry_id):
 
     Request JSON:
         certified_by: Email of the certifying SME
+        parameterized_sql: (optional) Modified SQL to certify with
     """
     data = request.get_json() or {}
     certified_by = data.get('certified_by', 'admin@bannerhealth.com')
+    modified_sql = data.get('parameterized_sql')
 
     try:
-        result = certify_entry(entry_id, certified_by=certified_by)
+        result = certify_entry(entry_id, certified_by=certified_by, modified_sql=modified_sql)
         return jsonify(result), 200
     except ValueError as e:
         return jsonify({'error': str(e)}), 404
     except Exception as e:
         logger.error(f"Failed to certify {entry_id}: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@corpus_bp.route('/api/corpus/run-query', methods=['POST'])
+def api_corpus_run_query():
+    """API: Run a SQL query for SME review preview.
+
+    Request JSON:
+        sql: The SQL query to execute
+    """
+    data = request.get_json() or {}
+    sql = data.get('sql', '').strip()
+    if not sql:
+        return jsonify({'error': 'No SQL query provided'}), 400
+
+    # Only allow SELECT queries for safety
+    if not sql.upper().startswith('SELECT'):
+        return jsonify({'error': 'Only SELECT queries are allowed'}), 400
+
+    try:
+        w = WorkspaceClient()
+        warehouse_id = os.environ.get('SQL_WAREHOUSE_ID', '2d8e531640ffa469')
+        response = w.statement_execution.execute_statement(
+            warehouse_id=warehouse_id,
+            statement=sql + ' LIMIT 50',
+            wait_timeout='30s',
+        )
+        if response.status and response.status.state.value == 'FAILED':
+            error_msg = response.status.error.message if response.status.error else 'Query failed'
+            return jsonify({'error': error_msg}), 200
+
+        # Convert results to list of dicts
+        columns = [col.name for col in response.manifest.schema.columns]
+        rows = []
+        if response.result and response.result.data_array:
+            for row in response.result.data_array:
+                rows.append(dict(zip(columns, row)))
+
+        return jsonify({'results': rows}), 200
+    except Exception as e:
+        logger.error(f"Failed to run query: {e}")
+        return jsonify({'error': str(e)}), 200
 
 
 @corpus_bp.route('/api/corpus/reject/<entry_id>', methods=['POST'])
