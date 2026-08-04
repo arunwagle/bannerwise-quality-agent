@@ -51,31 +51,53 @@ print(f"Rate limit: {RATE_LIMIT_CALLS} calls/{RATE_LIMIT_PERIOD}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Configure AI Gateway (handles existing inference table)
 w = WorkspaceClient()
 
-# Apply AI Gateway configuration
-w.serving_endpoints.put_ai_gateway(
-    name=ENDPOINT_NAME,
-    inference_table_config=AiGatewayInferenceTableConfig(
-        catalog_name=CATALOG,
-        schema_name=SCHEMA,
-        table_name_prefix="router_inference",
-        enabled=True,
-    ),
-    rate_limits=[
-        AiGatewayRateLimit(
-            calls=RATE_LIMIT_CALLS,
-            renewal_period=AiGatewayRateLimitRenewalPeriod.MINUTE,
-            key=AiGatewayRateLimitKey.USER,
-        ),
-    ],
-    usage_tracking_config=AiGatewayUsageTrackingConfig(enabled=True),
+# Build the gateway config
+inference_table_cfg = AiGatewayInferenceTableConfig(
+    catalog_name=CATALOG,
+    schema_name=SCHEMA,
+    table_name_prefix="router_inference",
+    enabled=True,
 )
 
-print(f"\n\u2713 AI Gateway configured on '{ENDPOINT_NAME}':")
-print(f"  - Inference tables: ENABLED ({CATALOG}.{SCHEMA}.router_inference_*)")
-print(f"  - Usage tracking: ENABLED")
-print(f"  - Rate limits: {RATE_LIMIT_CALLS} calls/{RATE_LIMIT_PERIOD} per user")
+rate_limits_cfg = [
+    AiGatewayRateLimit(
+        calls=RATE_LIMIT_CALLS,
+        renewal_period=AiGatewayRateLimitRenewalPeriod.MINUTE,
+        key=AiGatewayRateLimitKey.USER,
+    ),
+]
+
+usage_tracking_cfg = AiGatewayUsageTrackingConfig(enabled=True)
+
+# Apply AI Gateway configuration — handle case where inference table already exists
+try:
+    w.serving_endpoints.put_ai_gateway(
+        name=ENDPOINT_NAME,
+        inference_table_config=inference_table_cfg,
+        rate_limits=rate_limits_cfg,
+        usage_tracking_config=usage_tracking_cfg,
+    )
+    print(f"\u2713 AI Gateway configured with inference tables")
+except Exception as e:
+    if "already exists" in str(e):
+        # Inference table exists from a previous run — apply config without it
+        print(f"\u2139 Inference table already exists, configuring rate limits + usage tracking only")
+        w.serving_endpoints.put_ai_gateway(
+            name=ENDPOINT_NAME,
+            rate_limits=rate_limits_cfg,
+            usage_tracking_config=usage_tracking_cfg,
+        )
+        print(f"\u2713 AI Gateway configured (inference table retained from previous run)")
+    else:
+        raise
+
+print(f"\n  Endpoint: {ENDPOINT_NAME}")
+print(f"  Inference tables: {CATALOG}.{SCHEMA}.router_inference_*")
+print(f"  Usage tracking: ENABLED")
+print(f"  Rate limits: {RATE_LIMIT_CALLS} calls/{RATE_LIMIT_PERIOD} per user")
 
 # COMMAND ----------
 
