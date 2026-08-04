@@ -1,9 +1,9 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Generate Synthetic Data — Bannerwise Quality Agent
-# MAGIC 
+# MAGIC
 # MAGIC Populates the data model tables with realistic synthetic data using **dbldatagen**.
-# MAGIC 
+# MAGIC
 # MAGIC **Parameters:**
 # MAGIC - `catalog_name`: Target Unity Catalog catalog
 # MAGIC - `schema_name`: Target schema
@@ -33,6 +33,7 @@ spark.sql(f"USE SCHEMA {schema_name}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Generate certified QA corpus
 import dbldatagen as dg
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
@@ -167,7 +168,7 @@ corpus_schema = StructType([
 ])
 
 corpus_df = spark.createDataFrame(corpus_rows, schema=corpus_schema)
-corpus_df.write.mode("append").saveAsTable(f"{catalog_name}.{schema_name}.certified_qa_corpus")
+corpus_df.write.mode("overwrite").saveAsTable(f"{catalog_name}.{schema_name}.certified_qa_corpus")
 print(f"✓ Wrote {corpus_df.count()} rows to certified_qa_corpus")
 
 # COMMAND ----------
@@ -177,6 +178,7 @@ print(f"✓ Wrote {corpus_df.count()} rows to certified_qa_corpus")
 
 # COMMAND ----------
 
+# DBTITLE 1,Generate query history
 import dbldatagen as dg
 from pyspark.sql import functions as F
 
@@ -223,7 +225,7 @@ history_df = (
     .drop("row_id")
 )
 
-history_df.write.mode("append").saveAsTable(f"{catalog_name}.{schema_name}.query_history")
+history_df.write.mode("overwrite").saveAsTable(f"{catalog_name}.{schema_name}.query_history")
 print(f"✓ Wrote {history_df.count()} rows to query_history")
 
 # COMMAND ----------
@@ -233,6 +235,7 @@ print(f"✓ Wrote {history_df.count()} rows to query_history")
 
 # COMMAND ----------
 
+# DBTITLE 1,Generate SME review queue
 NUM_REVIEW_ROWS = 30
 
 review_spec = (
@@ -285,7 +288,7 @@ review_df = (
     .withColumn("notes", F.when(F.col("status") == "pending", None).otherwise(F.col("notes")))
 )
 
-review_df.write.mode("append").saveAsTable(f"{catalog_name}.{schema_name}.sme_review_queue")
+review_df.write.mode("overwrite").saveAsTable(f"{catalog_name}.{schema_name}.sme_review_queue")
 print(f"✓ Wrote {review_df.count()} rows to sme_review_queue")
 
 # COMMAND ----------
