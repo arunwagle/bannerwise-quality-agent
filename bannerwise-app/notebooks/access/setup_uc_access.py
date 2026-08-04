@@ -47,9 +47,13 @@ print(f"✓ Granted USE CATALOG on {CATALOG} to {APP_SP_APP_ID}")
 spark.sql(f"GRANT USE SCHEMA ON SCHEMA `{CATALOG}`.`{SCHEMA}` TO `{APP_SP_APP_ID}`")
 print(f"✓ Granted USE SCHEMA on {CATALOG}.{SCHEMA} to {APP_SP_APP_ID}")
 
-# Grant SELECT on all tables in the schema
+# Grant SELECT on all tables in the schema (read access)
 spark.sql(f"GRANT SELECT ON SCHEMA `{CATALOG}`.`{SCHEMA}` TO `{APP_SP_APP_ID}`")
 print(f"✓ Granted SELECT on {CATALOG}.{SCHEMA} to {APP_SP_APP_ID}")
+
+# Grant MODIFY on schema (needed for INSERT into query_history and certified_qa_corpus_draft)
+spark.sql(f"GRANT MODIFY ON SCHEMA `{CATALOG}`.`{SCHEMA}` TO `{APP_SP_APP_ID}`")
+print(f"✓ Granted MODIFY on {CATALOG}.{SCHEMA} to {APP_SP_APP_ID}")
 
 # COMMAND ----------
 
