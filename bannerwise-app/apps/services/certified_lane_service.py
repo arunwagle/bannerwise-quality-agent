@@ -99,14 +99,17 @@ Output: {{"period": "Q1 2025"}}
 
 Return ONLY the JSON object, no explanation."""
 
-    # Use SDK to call LLM endpoint (handles auth and URL automatically)
-    resp = w.serving_endpoints.query(
-        name=LLM_ENDPOINT,
-        messages=[{"role": "user", "content": extraction_prompt}],
-        temperature=0.0,
-        max_tokens=200,
+    # Use SDK api_client to call LLM endpoint (handles auth and URL automatically)
+    resp = w.api_client.do(
+        "POST",
+        f"/serving-endpoints/{LLM_ENDPOINT}/invocations",
+        body={
+            "messages": [{"role": "user", "content": extraction_prompt}],
+            "temperature": 0.0,
+            "max_tokens": 200,
+        },
     )
-    llm_response = resp.choices[0].message.content.strip()
+    llm_response = resp["choices"][0]["message"]["content"].strip()
 
     # Parse JSON from LLM response
     try:
