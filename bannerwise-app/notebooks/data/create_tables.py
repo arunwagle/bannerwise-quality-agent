@@ -28,6 +28,7 @@ print(f"Using {catalog_name}.{schema_name}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Create certified_qa_corpus
 spark.sql(f"""
 CREATE TABLE IF NOT EXISTS {catalog_name}.{schema_name}.certified_qa_corpus (
     id                  STRING        NOT NULL  COMMENT 'Unique corpus entry identifier (e.g. QA-0001)',
@@ -44,9 +45,6 @@ CREATE TABLE IF NOT EXISTS {catalog_name}.{schema_name}.certified_qa_corpus (
     updated_at          TIMESTAMP               COMMENT 'Last modification timestamp'
 )
 COMMENT 'SME-certified Q&A corpus for the deterministic confidence gate. Source for Vector Search Delta Sync index.'
-TBLPROPERTIES (
-    'delta.enableChangeDataFeed' = 'true'
-)
 """)
 print("certified_qa_corpus created")
 
