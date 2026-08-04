@@ -179,8 +179,6 @@ resources:
           default: '100'
         - name: rate_limit_period
           default: minute
-        - name: app_sp_id
-          default: ${resources.apps.bannerwise_quality_agent.service_principal_id}
 
       tasks:
         - task_key: run_router_agent
@@ -241,7 +239,6 @@ resources:
               endpoint_name: '{{job.parameters.endpoint_name}}'
               workload_size: '{{job.parameters.workload_size}}'
               scale_to_zero: '{{job.parameters.scale_to_zero}}'
-              app_sp_id: '{{job.parameters.app_sp_id}}'
 
         - task_key: configure_ai_gateway
           description: 'Enable inference tables, usage tracking, and rate limits via AI Gateway'

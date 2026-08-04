@@ -40,9 +40,6 @@ ENDPOINT_NAME = dbutils.widgets.get("endpoint_name")
 WORKLOAD_SIZE = dbutils.widgets.get("workload_size")
 SCALE_TO_ZERO = dbutils.widgets.get("scale_to_zero").lower() == "true"
 
-dbutils.widgets.text("app_sp_id", "")
-APP_SP_ID = dbutils.widgets.get("app_sp_id")
-
 FULL_MODEL_NAME = f"{CATALOG}.{SCHEMA}.{MODEL_NAME}"
 
 print(f"Endpoint: {ENDPOINT_NAME}")
@@ -120,43 +117,6 @@ except Exception as e:
         print(f"✓ Endpoint created with champion version {champion_version}")
     else:
         raise
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Grant App Permissions
-
-# COMMAND ----------
-
-# DBTITLE 1,Grant App Permissions
-# Grant CAN_QUERY to the app's service principal
-if APP_SP_ID:
-    try:
-        # Resolve SP numeric ID to application_id (UUID)
-        sp = w.service_principals.get(id=APP_SP_ID)
-        app_sp_app_id = sp.application_id
-        print(f"  Resolved SP ID {APP_SP_ID} -> application_id: {app_sp_app_id}")
-
-        endpoint_obj = w.serving_endpoints.get(ENDPOINT_NAME)
-        payload = {
-            "access_control_list": [
-                {
-                    "service_principal_name": app_sp_app_id,
-                    "permission_level": "CAN_QUERY",
-                }
-            ]
-        }
-        w.api_client.do(
-            "PATCH",
-            f"/api/2.0/permissions/serving-endpoints/{endpoint_obj.id}",
-            body=payload,
-        )
-        print(f"\u2713 Granted CAN_QUERY on '{ENDPOINT_NAME}' to {app_sp_app_id}")
-    except Exception as e:
-        print(f"\u26a0 Permission grant failed (endpoint may not be ready): {e}")
-        print("  Grant manually via UI: Serving Endpoints → Permissions")
-else:
-    print("\u26a0 No app_sp_id provided — skipping permission grant")
 
 # COMMAND ----------
 
