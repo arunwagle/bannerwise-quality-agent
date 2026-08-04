@@ -18,14 +18,24 @@ print(f"Model to remove: {FULL_MODEL_NAME}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Delete all model versions then the model
 from databricks.sdk import WorkspaceClient
 
 w = WorkspaceClient()
 
 try:
-    # Delete all versions and the model itself
+    # Step 1: Delete all model versions first (required before model deletion)
+    versions = list(w.model_versions.list(full_name=FULL_MODEL_NAME))
+    print(f"Found {len(versions)} model version(s) to remove")
+    
+    for v in versions:
+        w.model_versions.delete(full_name=FULL_MODEL_NAME, version=v.version)
+        print(f"  \u2713 Deleted version {v.version} (aliases: {v.aliases})")
+    
+    # Step 2: Delete the model itself (now empty)
     w.registered_models.delete(full_name=FULL_MODEL_NAME)
     print(f"\u2713 Deleted registered model: {FULL_MODEL_NAME}")
+
 except Exception as e:
     if "NOT_FOUND" in str(e) or "RESOURCE_DOES_NOT_EXIST" in str(e):
         print(f"\u2139 Model '{FULL_MODEL_NAME}' does not exist (already cleaned up)")
