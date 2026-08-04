@@ -1,4 +1,4 @@
-"""History Service — reads query history from the Delta table."""
+"""Live History Service — reads query history from Delta table."""
 
 import os
 import logging
@@ -11,7 +11,6 @@ CATALOG = os.environ.get("CATALOG_NAME", "aw_serverless_stable_catalog")
 SCHEMA = os.environ.get("SCHEMA_NAME", "bannerhealth")
 SQL_WAREHOUSE_ID = os.environ.get("SQL_WAREHOUSE_ID", "2d8e531640ffa469")
 HISTORY_TABLE = f"{CATALOG}.{SCHEMA}.query_history"
-
 
 
 def _get_client():
@@ -53,13 +52,13 @@ def get_history_stats() -> dict:
     w = _get_client()
     sql = f"""
     SELECT
-        COUNT(*) as total_queries,
-        SUM(CASE WHEN lane = 'certified' THEN 1 ELSE 0 END) as certified_count,
-        SUM(CASE WHEN lane = 'analytical' THEN 1 ELSE 0 END) as analytical_count,
-        ROUND(AVG(confidence), 3) as avg_confidence
+        COUNT(*) as total,
+        SUM(CASE WHEN lane = 'certified' THEN 1 ELSE 0 END) as certified,
+        SUM(CASE WHEN lane = 'analytical' THEN 1 ELSE 0 END) as analytical,
+        AVG(latency_ms) as avg_latency_ms
     FROM {HISTORY_TABLE}
     """
     rows = _execute_sql(w, sql)
     if rows:
         return rows[0]
-    return {"total_queries": 0, "certified_count": 0, "analytical_count": 0, "avg_confidence": 0}
+    return {"total": 0, "certified": 0, "analytical": 0, "avg_latency_ms": 0}
