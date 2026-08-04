@@ -96,9 +96,10 @@ function toggleProvenance(btn) {
 
 async function addToSMEReview() {
     if (!_lastResult || !_lastPrompt) {
-        alert('No result to submit for review.');
+        showToast('No result to submit for review.', 'warning');
         return;
     }
+    showLoading('Submitting for review...');
     try {
         const payload = {
             question: _lastPrompt,
@@ -109,14 +110,16 @@ async function addToSMEReview() {
             original_prompt: _lastPrompt,
         };
         await apiPost('/api/corpus/drafts', payload);
-        alert('\u2705 Added to SME Review queue. Visit the Review page to certify or reject.');
+        showToast('Added to SME Review queue. Visit the Review page to certify or reject.', 'success');
     } catch (err) {
-        alert('Failed to submit for review: ' + err.message);
+        showToast('Failed to submit for review: ' + err.message, 'error');
+    } finally {
+        hideLoading();
     }
 }
 
 function flagIncorrect() {
-    alert('Flagged as incorrect. An admin will review this response.');
+    showToast('Flagged as incorrect. An admin will review this response.', 'warning');
 }
 
 function renderError(message) {
@@ -174,37 +177,44 @@ function renderHistoryTable(entries) {
 // ============================================================
 
 async function loadReviewQueue() {
-    const search = document.getElementById('corpusSearch')?.value || '';
-    const query = search ? `?search=${encodeURIComponent(search)}` : '';
-    const data = await apiGet(`/api/corpus/drafts${query}`);
+    showLoading('Loading review queue...');
+    try {
+        const search = document.getElementById('corpusSearch')?.value || '';
+        const query = search ? `?search=${encodeURIComponent(search)}` : '';
+        const data = await apiGet(`/api/corpus/drafts${query}`);
 
-    // Render stats
-    const statsEl = document.getElementById('corpusStats');
-    if (statsEl) {
-        const count = data.entries ? data.entries.length : 0;
-        statsEl.innerHTML = `<span class="stat-item"><strong>${count}</strong> pending review</span>`;
-    }
+        // Render stats
+        const statsEl = document.getElementById('corpusStats');
+        if (statsEl) {
+            const count = data.entries ? data.entries.length : 0;
+            statsEl.innerHTML = `<span class="stat-item"><strong>${count}</strong> pending review</span>`;
+        }
 
-    // Render table
-    const tbody = document.getElementById('corpusTableBody');
-    if (!tbody) return;
-    if (!data.entries || data.entries.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#888">No items pending review</td></tr>';
-        return;
+        // Render table
+        const tbody = document.getElementById('corpusTableBody');
+        if (!tbody) return;
+        if (!data.entries || data.entries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#888">No items pending review</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.entries.map(entry => `
+            <tr onclick="showReviewDetail('${entry.id}')" style="cursor:pointer">
+                <td><code>${entry.id}</code></td>
+                <td>${escapeHtml(entry.question || '')}</td>
+                <td><code style="font-size:0.8em;word-break:break-all">${escapeHtml((entry.parameterized_sql || '').substring(0, 80))}${(entry.parameterized_sql || '').length > 80 ? '...' : ''}</code></td>
+                <td>${entry.submitted_by || '—'}</td>
+                <td>${entry.created_at || '—'}</td>
+                <td>
+                    <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); certifyEntry('${entry.id}')">Certify</button>
+                    <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); rejectEntry('${entry.id}')">Reject</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        showToast('Failed to load review queue: ' + err.message, 'error');
+    } finally {
+        hideLoading();
     }
-    tbody.innerHTML = data.entries.map(entry => `
-        <tr onclick="showReviewDetail('${entry.id}')" style="cursor:pointer">
-            <td><code>${entry.id}</code></td>
-            <td>${escapeHtml(entry.question || '')}</td>
-            <td><code style="font-size:0.8em;word-break:break-all">${escapeHtml((entry.parameterized_sql || '').substring(0, 80))}${(entry.parameterized_sql || '').length > 80 ? '...' : ''}</code></td>
-            <td>${entry.submitted_by || '—'}</td>
-            <td>${entry.created_at || '—'}</td>
-            <td>
-                <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); certifyEntry('${entry.id}')">Certify</button>
-                <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); rejectEntry('${entry.id}')">Reject</button>
-            </td>
-        </tr>
-    `).join('');
 }
 
 function searchCorpus() {
@@ -249,7 +259,7 @@ function closeReviewDetail() {
 async function runModifiedQuery(entryId) {
     const sql = document.getElementById('reviewSqlEditor')?.value;
     if (!sql || !sql.trim()) {
-        alert('Please enter a SQL query to run.');
+        showToast('Please enter a SQL query to run.', 'warning');
         return;
     }
     const resultDiv = document.getElementById('reviewQueryResult');
@@ -281,38 +291,50 @@ async function runModifiedQuery(entryId) {
 
 async function certifyWithSql(entryId) {
     const sql = document.getElementById('reviewSqlEditor')?.value || '';
-    if (!confirm('Certify this entry with the current SQL query?')) return;
+    const confirmed = await showConfirm('Certify this entry with the current SQL query?');
+    if (!confirmed) return;
+    showLoading('Certifying entry...');
     try {
         await apiPost(`/api/corpus/certify/${entryId}`, { parameterized_sql: sql.trim() });
-        alert('\u2705 Entry certified successfully.');
+        showToast('Entry certified successfully.', 'success');
         loadReviewQueue();
         closeReviewDetail();
     } catch (err) {
-        alert('Failed to certify: ' + err.message);
+        showToast('Failed to certify: ' + err.message, 'error');
+    } finally {
+        hideLoading();
     }
 }
 
 async function certifyEntry(entryId) {
-    if (!confirm('Certify this entry? It will be added to the certified Q&A corpus.')) return;
+    const confirmed = await showConfirm('Certify this entry? It will be added to the certified Q&A corpus.');
+    if (!confirmed) return;
+    showLoading('Certifying entry...');
     try {
         await apiPost(`/api/corpus/certify/${entryId}`);
-        alert('\u2705 Entry certified successfully.');
+        showToast('Entry certified successfully.', 'success');
         loadReviewQueue();
         document.getElementById('corpusDetail')?.classList.add('hidden');
     } catch (err) {
-        alert('Failed to certify: ' + err.message);
+        showToast('Failed to certify: ' + err.message, 'error');
+    } finally {
+        hideLoading();
     }
 }
 
 async function rejectEntry(entryId) {
-    if (!confirm('Reject this entry? It will be removed from the review queue.')) return;
+    const confirmed = await showConfirm('Reject this entry? It will be removed from the review queue.');
+    if (!confirmed) return;
+    showLoading('Rejecting entry...');
     try {
         await apiPost(`/api/corpus/reject/${entryId}`);
-        alert('Entry rejected and removed.');
+        showToast('Entry rejected and removed.', 'info');
         loadReviewQueue();
         document.getElementById('corpusDetail')?.classList.add('hidden');
     } catch (err) {
-        alert('Failed to reject: ' + err.message);
+        showToast('Failed to reject: ' + err.message, 'error');
+    } finally {
+        hideLoading();
     }
 }
 
@@ -377,8 +399,15 @@ function updateThresholdDisplay() {
 
 async function saveThreshold() {
     const value = document.getElementById('thresholdSlider').value / 100;
-    await apiPut('/api/admin/config', { confidence_threshold: value });
-    alert(`Threshold updated to ${value.toFixed(2)}`);
+    showLoading('Saving threshold...');
+    try {
+        await apiPut('/api/admin/config', { confidence_threshold: value });
+        showToast(`Threshold updated to ${value.toFixed(2)}`, 'success');
+    } catch (err) {
+        showToast('Failed to save threshold: ' + err.message, 'error');
+    } finally {
+        hideLoading();
+    }
 }
 
 // ============================================================
@@ -424,6 +453,21 @@ function escapeHtml(str) {
 
 function formatAnswer(str) {
     if (!str) return '<em>No answer available</em>';
+
+    // Detect tabular data: "Result: {'key': 'val', ...}" or list of dicts
+    const tableMatch = str.match(/^Result:\s*(\[?\{.+\}\]?)$/s);
+    if (tableMatch) {
+        try {
+            // Convert Python-style dict to JSON (single quotes → double quotes)
+            let jsonStr = tableMatch[1].replace(/'/g, '"');
+            let data = JSON.parse(jsonStr);
+            if (!Array.isArray(data)) data = [data];
+            if (data.length > 0 && typeof data[0] === 'object') {
+                return renderResultTable(data);
+            }
+        } catch (e) { /* fall through to text rendering */ }
+    }
+
     // Escape HTML first for safety
     let safe = escapeHtml(str);
     // Convert **bold** to <strong>
@@ -431,6 +475,16 @@ function formatAnswer(str) {
     // Convert newlines to <br> for readability
     safe = safe.replace(/\n/g, '<br>');
     return safe;
+}
+
+function renderResultTable(rows) {
+    const cols = Object.keys(rows[0]);
+    let html = '<table class="result-table" style="width:100%;font-size:0.9em;border-collapse:collapse;margin-top:0.5rem">';
+    html += '<thead><tr>' + cols.map(c => `<th style="border-bottom:2px solid #ddd;padding:6px 8px;text-align:left;font-weight:600">${escapeHtml(formatKey(c))}</th>`).join('') + '</tr></thead>';
+    html += '<tbody>' + rows.map(row =>
+        '<tr>' + cols.map(c => `<td style="border-bottom:1px solid #eee;padding:6px 8px">${escapeHtml(String(row[c] ?? ''))}</td>`).join('') + '</tr>'
+    ).join('') + '</tbody></table>';
+    return html;
 }
 
 function formatKey(key) {
@@ -441,6 +495,94 @@ function formatTimestamp(iso) {
     const d = new Date(iso);
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
+// ============================================================
+// TOAST NOTIFICATIONS (replaces browser alert/confirm)
+// ============================================================
+
+function showToast(message, type = 'info', duration = 4000) {
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:0.5rem;max-width:400px';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    const colors = { success: '#10b981', error: '#ef4444', warning: '#f59e0b', info: '#3b82f6' };
+    toast.style.cssText = `padding:0.75rem 1rem;border-radius:8px;color:#fff;background:${colors[type] || colors.info};box-shadow:0 4px 12px rgba(0,0,0,0.15);font-size:0.9rem;opacity:0;transform:translateX(20px);transition:all 0.3s ease;cursor:pointer`;
+    toast.textContent = message;
+    toast.onclick = () => dismissToast(toast);
+    container.appendChild(toast);
+    requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateX(0)'; });
+    if (duration > 0) setTimeout(() => dismissToast(toast), duration);
+}
+
+function dismissToast(toast) {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(20px)';
+    setTimeout(() => toast.remove(), 300);
+}
+
+function showConfirm(message) {
+    return new Promise((resolve) => {
+        let overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:10000;display:flex;align-items:center;justify-content:center';
+        const dialog = document.createElement('div');
+        dialog.style.cssText = 'background:#fff;border-radius:12px;padding:1.5rem;max-width:400px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2)';
+        dialog.innerHTML = `
+            <p style="margin:0 0 1.25rem;font-size:0.95rem;color:#333">${escapeHtml(message)}</p>
+            <div style="display:flex;gap:0.75rem;justify-content:flex-end">
+                <button class="btn btn-secondary" id="confirmCancel">Cancel</button>
+                <button class="btn btn-primary" id="confirmOk">Confirm</button>
+            </div>
+        `;
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+        dialog.querySelector('#confirmOk').onclick = () => { overlay.remove(); resolve(true); };
+        dialog.querySelector('#confirmCancel').onclick = () => { overlay.remove(); resolve(false); };
+        overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } };
+    });
+}
+
+// ============================================================
+// LOADING OVERLAY
+// ============================================================
+
+function showLoading(message = 'Loading...') {
+    let overlay = document.getElementById('globalLoading');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'globalLoading';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.7);z-index:9998;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0.75rem';
+        overlay.innerHTML = `
+            <div class="spinner" style="width:36px;height:36px;border:3px solid #e5e7eb;border-top-color:#3b82f6;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+            <span id="loadingMessage" style="font-size:0.9rem;color:#555"></span>
+        `;
+        const style = document.createElement('style');
+        style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+        document.head.appendChild(style);
+        document.body.appendChild(overlay);
+    }
+    overlay.querySelector('#loadingMessage').textContent = message;
+    overlay.classList.remove('hidden');
+    overlay.style.display = 'flex';
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('globalLoading');
+    if (overlay) overlay.style.display = 'none';
+}
+
+// Show loading spinner on navigation link clicks
+document.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+        const href = link.getAttribute('href');
+        if (href && href !== window.location.pathname) {
+            showLoading('Loading...');
+        }
+    });
+});
 
 // Allow Enter key to submit on Ask page
 document.addEventListener('keydown', (e) => {
