@@ -7,7 +7,7 @@ which auto-syncs to the Vector Search index.
 
 import logging
 from flask import Blueprint, render_template, request, jsonify
-from services.live_corpus_service import (
+from services.corpus_service import (
     get_draft_entries,
     get_draft_by_id,
     get_draft_stats,

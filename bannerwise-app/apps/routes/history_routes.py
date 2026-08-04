@@ -1,7 +1,7 @@
 """History routes — past queries page and API."""
 
 from flask import Blueprint, render_template, request, jsonify
-from services.mock_history_service import get_history, get_history_stats
+from services.history_service import get_history, get_history_stats
 
 history_bp = Blueprint('history', __name__)
 
