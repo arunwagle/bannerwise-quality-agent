@@ -17,22 +17,23 @@
 dbutils.widgets.text("catalog_name", "aw_serverless_stable_catalog")
 dbutils.widgets.text("schema_name", "bannerhealth")
 dbutils.widgets.text("sql_warehouse_id", "2d8e531640ffa469")
+dbutils.widgets.text("genie_space_name", "Bannerwise Quality Analytics")
 
 CATALOG = dbutils.widgets.get("catalog_name")
 SCHEMA = dbutils.widgets.get("schema_name")
 WAREHOUSE_ID = dbutils.widgets.get("sql_warehouse_id")
+SPACE_TITLE = dbutils.widgets.get("genie_space_name")
 
 FQN = f"{CATALOG}.{SCHEMA}"
 print(f"Schema: {FQN}")
 print(f"Warehouse: {WAREHOUSE_ID}")
+print(f"Space name: {SPACE_TITLE}")
 
 # COMMAND ----------
 
 # DBTITLE 1,Space metadata
-SPACE_TITLE = "Bannerwise Quality Analytics"
-
 SPACE_DESCRIPTION = (
-    "AI-powered analytics space for Banner Health advertising data. "
+    f"{SPACE_TITLE} — AI-powered analytics space for Banner Health advertising data. "
     "Ask questions about ad spend, campaign performance, banner CTR, "
     "regional metrics, channel attribution, and creative engagement."
 )

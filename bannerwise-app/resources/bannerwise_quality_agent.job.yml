@@ -426,6 +426,8 @@ resources:
           default: ${var.schema_name}
         - name: sql_warehouse_id
           default: ${var.sql_warehouse_id}
+        - name: genie_space_name
+          default: 'Bannerwise Quality Analytics'
         - name: space_id
           default: ''
 
@@ -438,6 +440,7 @@ resources:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
               sql_warehouse_id: '{{job.parameters.sql_warehouse_id}}'
+              genie_space_name: '{{job.parameters.genie_space_name}}'
 
         - task_key: create_genie_space
           description: 'Call Genie Space API to create or update the space'
