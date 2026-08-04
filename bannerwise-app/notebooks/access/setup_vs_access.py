@@ -15,14 +15,13 @@ VS_ENDPOINT = dbutils.widgets.get('vs_endpoint_name')
 assert APP_SP_ID, "app_sp_id parameter is required"
 assert VS_ENDPOINT, "vs_endpoint_name parameter is required"
 
-# Resolve SP ID to display name
+# Resolve SP numeric ID to application_id (UUID) for permissions API
 from databricks.sdk import WorkspaceClient
 w = WorkspaceClient()
 sp = w.service_principals.get(id=APP_SP_ID)
-APP_SP = sp.display_name
+APP_SP_APP_ID = sp.application_id
 
-print(f"App SP ID: {APP_SP_ID}")
-print(f"App SP Name: {APP_SP}")
+print(f"App SP application_id: {APP_SP_APP_ID} (numeric ID: {APP_SP_ID})")
 print(f"VS Endpoint: {VS_ENDPOINT}")
 
 # COMMAND ----------
@@ -43,7 +42,7 @@ print(f"  Resolved '{VS_ENDPOINT}' -> UUID: {VS_ENDPOINT_ID}")
 payload = {
     "access_control_list": [
         {
-            "service_principal_name": APP_SP,
+            "service_principal_name": APP_SP_APP_ID,
             "all_permissions": [{"permission_level": "CAN_USE"}],
         }
     ]
@@ -66,9 +65,9 @@ resp = w.api_client.do(
 )
 acl = resp.get("access_control_list", [])
 for entry in acl:
-    if entry.get("service_principal_name") == APP_SP:
+    if entry.get("service_principal_name") == APP_SP_APP_ID:
         perms = [p["permission_level"] for p in entry.get("all_permissions", [])]
-        print(f"✅ Verified: {APP_SP} has {perms} on {VS_ENDPOINT}")
+        print(f"✅ Verified: {APP_SP_APP_ID} has {perms} on {VS_ENDPOINT}")
         break
 else:
-    print(f"⚠️ Could not verify permissions for {APP_SP}")
+    print(f"⚠️ Could not verify permissions for {APP_SP_APP_ID}")
