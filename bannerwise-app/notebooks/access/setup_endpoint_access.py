@@ -34,8 +34,17 @@ from databricks.sdk import WorkspaceClient
 
 w = WorkspaceClient()
 
+def get_endpoint_id(endpoint_name: str) -> str:
+    """Resolve serving endpoint name to its numeric ID."""
+    ep = w.serving_endpoints.get(name=endpoint_name)
+    return ep.id
+
 def grant_endpoint_access(endpoint_name: str, sp_name: str):
     """Grant CAN_QUERY on a serving endpoint to the given SP."""
+    # The permissions API requires the endpoint ID, not the name
+    endpoint_id = get_endpoint_id(endpoint_name)
+    print(f"  Resolved '{endpoint_name}' -> ID: {endpoint_id}")
+    
     payload = {
         "access_control_list": [
             {
@@ -47,7 +56,7 @@ def grant_endpoint_access(endpoint_name: str, sp_name: str):
     try:
         w.api_client.do(
             "PATCH",
-            f"/api/2.0/permissions/serving-endpoints/{endpoint_name}",
+            f"/api/2.0/permissions/serving-endpoints/{endpoint_id}",
             body=payload,
         )
         print(f"\u2713 Granted CAN_QUERY on '{endpoint_name}' to {sp_name}")
@@ -60,7 +69,11 @@ grant_endpoint_access(ROUTER_ENDPOINT, APP_SP)
 
 # Grant access to the LLM foundation model endpoint (for parameter extraction)
 if LLM_ENDPOINT:
-    grant_endpoint_access(LLM_ENDPOINT, APP_SP)
+    try:
+        grant_endpoint_access(LLM_ENDPOINT, APP_SP)
+    except Exception as e:
+        # Foundation model endpoints may not support custom permissions
+        print(f"\u2139 Skipping LLM endpoint permissions (foundation models are accessible by default): {e}")
 
 # COMMAND ----------
 
@@ -68,9 +81,10 @@ if LLM_ENDPOINT:
 # Verify permissions on the router endpoint
 def verify_endpoint_access(endpoint_name: str, sp_name: str):
     try:
+        endpoint_id = get_endpoint_id(endpoint_name)
         resp = w.api_client.do(
             "GET",
-            f"/api/2.0/permissions/serving-endpoints/{endpoint_name}",
+            f"/api/2.0/permissions/serving-endpoints/{endpoint_id}",
         )
         acl = resp.get("access_control_list", [])
         for entry in acl:
@@ -80,11 +94,9 @@ def verify_endpoint_access(endpoint_name: str, sp_name: str):
                 return True
         print(f"\u26a0\ufe0f {sp_name} not found in ACL for '{endpoint_name}'")
     except Exception as e:
-        print(f"\u26a0\ufe0f Could not read permissions for '{endpoint_name}': {e}")
+        print(f"\u26a0\ufe0f Could not verify permissions for '{endpoint_name}': {e}")
     return False
 
 verify_endpoint_access(ROUTER_ENDPOINT, APP_SP)
-if LLM_ENDPOINT:
-    verify_endpoint_access(LLM_ENDPOINT, APP_SP)
 
 print("\n\u2705 Serving endpoint access setup complete")
