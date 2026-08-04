@@ -55,7 +55,7 @@ def grant_endpoint_access(endpoint_name: str, sp_app_id: str):
         "access_control_list": [
             {
                 "service_principal_name": sp_app_id,
-                "all_permissions": [{"permission_level": "CAN_QUERY"}],
+                "permission_level": "CAN_QUERY",
             }
         ]
     }

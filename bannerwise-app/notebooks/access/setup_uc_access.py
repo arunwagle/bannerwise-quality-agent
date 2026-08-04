@@ -66,7 +66,7 @@ payload = {
     "access_control_list": [
         {
             "service_principal_name": APP_SP_APP_ID,
-            "all_permissions": [{"permission_level": "CAN_USE"}],
+            "permission_level": "CAN_USE",
         }
     ]
 }

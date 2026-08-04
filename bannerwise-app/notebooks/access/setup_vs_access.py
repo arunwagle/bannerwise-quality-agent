@@ -43,7 +43,7 @@ payload = {
     "access_control_list": [
         {
             "service_principal_name": APP_SP_APP_ID,
-            "all_permissions": [{"permission_level": "CAN_USE"}],
+            "permission_level": "CAN_USE",
         }
     ]
 }
@@ -53,7 +53,7 @@ w.api_client.do(
     f"/api/2.0/permissions/vector-search-endpoints/{VS_ENDPOINT_ID}",
     body=payload,
 )
-print(f"✓ Granted CAN_USE on VS endpoint '{VS_ENDPOINT}' to {APP_SP}")
+print(f"✓ Granted CAN_USE on VS endpoint '{VS_ENDPOINT}' to {APP_SP_APP_ID}")
 
 # COMMAND ----------
 
