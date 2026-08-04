@@ -88,7 +88,7 @@ def assess_prompt(prompt: str) -> dict:
 
             return {
                 "answer": certified_result["answer"],
-                "badge": "HUMAN APPROVED",
+                "badge": "Certified",
                 "confidence": round(confidence, 3),
                 "lane": "certified",
                 "provenance": {
@@ -109,7 +109,7 @@ def assess_prompt(prompt: str) -> dict:
         else:
             return {
                 "answer": None,
-                "badge": "NOT YET APPROVED",
+                "badge": "Not Certified",
                 "confidence": round(confidence, 3),
                 "lane": "analytical",
                 "provenance": {
