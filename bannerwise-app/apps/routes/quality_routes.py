@@ -37,12 +37,23 @@ def api_assess():
     Uses live Model Serving endpoint when API_MODE=live,
     otherwise falls back to mock service.
     """
-    data = request.get_json()
+    data = request.get_json(force=True, silent=True)
     if not data or not data.get('prompt'):
         return jsonify({'error': 'Missing required field: prompt'}), 400
 
-    assess_prompt = _get_router_service()
-    result = assess_prompt(data['prompt'])
+    try:
+        assess_prompt = _get_router_service()
+        result = assess_prompt(data['prompt'])
+    except Exception as e:
+        logger.error(f"assess_prompt failed unexpectedly: {e}")
+        result = {
+            "answer": f"An error occurred while processing your question: {str(e)[:200]}",
+            "badge": "ERROR",
+            "confidence": 0.0,
+            "lane": "error",
+            "provenance": {"error": str(e)},
+            "latency_ms": 0,
+        }
 
     # Log to query history (async-safe, won't block response on failure)
     try:
@@ -53,7 +64,7 @@ def api_assess():
             "badge": result.get("badge"),
             "corpus_id": result.get("corpus_id"),
             "sql_executed": result.get("sql_executed", ""),
-            "answer": result.get("answer", ""),
+            "answer": result.get("answer") or "",
             "latency_ms": result.get("latency_ms", 0),
             "user_email": "app_user",
         })

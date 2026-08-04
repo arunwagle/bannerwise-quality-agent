@@ -434,6 +434,34 @@ body {
     border-color: var(--color-secondary);
     color: var(--color-secondary);
 }
+.btn-sm {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.75rem;
+}
+.btn-success {
+    background: #10b981;
+    color: white;
+}
+.btn-success:hover {
+    background: #059669;
+}
+.btn-danger {
+    background: #ef4444;
+    color: white;
+}
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+/* Action button container in table cells */
+.data-table td:last-child {
+    white-space: nowrap;
+}
+.data-table td:last-child .btn {
+    display: inline-block;
+    margin-right: 0.25rem;
+    vertical-align: middle;
+}
 
 /* --- Loading --- */
 .loading-indicator {
