@@ -37,26 +37,13 @@ payload = {
     ]
 }
 
-try:
-    w.api_client.do(
-        "PATCH",
-        f"/api/2.0/permissions/dashboards/{GENIE_SPACE_ID}",
-        body=payload,
-    )
-    print(f"\u2713 Granted CAN_RUN on Genie Space {GENIE_SPACE_ID} to {APP_SP_APP_ID}")
-except Exception as e:
-    print(f"\u26a0\ufe0f Could not grant via dashboards API: {e}")
-    print("Trying genie/spaces permissions path...")
-    try:
-        w.api_client.do(
-            "PATCH",
-            f"/api/2.0/permissions/genie/spaces/{GENIE_SPACE_ID}",
-            body=payload,
-        )
-        print(f"\u2713 Granted CAN_RUN on Genie Space {GENIE_SPACE_ID} to {APP_SP_APP_ID}")
-    except Exception as e2:
-        raise RuntimeError(f"Failed to grant Genie Space access: {e2}")
-
+# Correct permissions API path for Genie Spaces: /api/2.0/permissions/genie/{space_id}
+w.api_client.do(
+    "PATCH",
+    f"/api/2.0/permissions/genie/{GENIE_SPACE_ID}",
+    body=payload,
+)
+print(f"\u2713 Granted CAN_RUN on Genie Space {GENIE_SPACE_ID} to {APP_SP_APP_ID}")
 print("\n\u2705 Genie Space access setup complete")
 
 # COMMAND ----------
