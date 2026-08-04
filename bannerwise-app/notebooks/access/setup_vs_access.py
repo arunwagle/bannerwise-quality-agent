@@ -6,16 +6,23 @@
 # COMMAND ----------
 
 # DBTITLE 1,Parameters
-dbutils.widgets.text('app_sp_name', '')
+dbutils.widgets.text('app_sp_id', '')
 dbutils.widgets.text('vs_endpoint_name', 'bannerwise-vs-endpoint')
 
-APP_SP = dbutils.widgets.get('app_sp_name')
+APP_SP_ID = dbutils.widgets.get('app_sp_id')
 VS_ENDPOINT = dbutils.widgets.get('vs_endpoint_name')
 
-assert APP_SP, "app_sp_name parameter is required"
+assert APP_SP_ID, "app_sp_id parameter is required"
 assert VS_ENDPOINT, "vs_endpoint_name parameter is required"
 
-print(f"App SP: {APP_SP}")
+# Resolve SP ID to display name
+from databricks.sdk import WorkspaceClient
+w = WorkspaceClient()
+sp = w.service_principals.get(id=APP_SP_ID)
+APP_SP = sp.display_name
+
+print(f"App SP ID: {APP_SP_ID}")
+print(f"App SP Name: {APP_SP}")
 print(f"VS Endpoint: {VS_ENDPOINT}")
 
 # COMMAND ----------
@@ -27,21 +34,7 @@ print(f"VS Endpoint: {VS_ENDPOINT}")
 # COMMAND ----------
 
 # DBTITLE 1,Grant VS endpoint access to app SP
-from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.iam import (
-    ObjectPermissions,
-    PermissionLevel,
-)
-
-w = WorkspaceClient()
-
-# Look up the SP ID from the SP name
-sp_list = list(w.service_principals.list(filter=f"displayName eq '{APP_SP}'"))
-assert sp_list, f"Service principal '{APP_SP}' not found"
-sp_id = sp_list[0].id
-print(f"Found SP: {APP_SP} (ID: {sp_id})")
-
-# Grant CAN_USE on the VS endpoint using the SDK's api_client (avoids auth issues)
+# Grant CAN_USE on the VS endpoint
 payload = {
     "access_control_list": [
         {
@@ -51,7 +44,7 @@ payload = {
     ]
 }
 
-resp = w.api_client.do(
+w.api_client.do(
     "PATCH",
     f"/api/2.0/permissions/vector-search-endpoints/{VS_ENDPOINT}",
     body=payload,

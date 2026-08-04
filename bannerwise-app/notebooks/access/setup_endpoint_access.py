@@ -6,18 +6,25 @@
 # COMMAND ----------
 
 # DBTITLE 1,Parameters
-dbutils.widgets.text('app_sp_name', '')
+dbutils.widgets.text('app_sp_id', '')
 dbutils.widgets.text('serving_endpoint_name', 'bannerwise-quality-router')
 dbutils.widgets.text('llm_endpoint_name', 'databricks-meta-llama-3-3-70b-instruct')
 
-APP_SP = dbutils.widgets.get('app_sp_name')
+APP_SP_ID = dbutils.widgets.get('app_sp_id')
 ROUTER_ENDPOINT = dbutils.widgets.get('serving_endpoint_name')
 LLM_ENDPOINT = dbutils.widgets.get('llm_endpoint_name')
 
-assert APP_SP, "app_sp_name parameter is required"
+assert APP_SP_ID, "app_sp_id parameter is required"
 assert ROUTER_ENDPOINT, "serving_endpoint_name parameter is required"
 
-print(f"App SP: {APP_SP}")
+# Resolve SP ID to display name
+from databricks.sdk import WorkspaceClient
+w = WorkspaceClient()
+sp = w.service_principals.get(id=APP_SP_ID)
+APP_SP = sp.display_name
+
+print(f"App SP ID: {APP_SP_ID}")
+print(f"App SP Name: {APP_SP}")
 print(f"Router Endpoint: {ROUTER_ENDPOINT}")
 print(f"LLM Endpoint: {LLM_ENDPOINT}")
 

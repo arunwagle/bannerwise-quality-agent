@@ -8,20 +8,26 @@
 # DBTITLE 1,Parameters
 dbutils.widgets.text('catalog_name', 'aw_serverless_stable_catalog')
 dbutils.widgets.text('schema_name', 'bannerhealth')
-dbutils.widgets.text('app_sp_name', '')
+dbutils.widgets.text('app_sp_id', '')
 dbutils.widgets.text('sql_warehouse_id', '')
 
 CATALOG = dbutils.widgets.get('catalog_name')
 SCHEMA = dbutils.widgets.get('schema_name')
-APP_SP = dbutils.widgets.get('app_sp_name')
+APP_SP_ID = dbutils.widgets.get('app_sp_id')
 WAREHOUSE_ID = dbutils.widgets.get('sql_warehouse_id')
 
-assert APP_SP, "app_sp_name parameter is required"
+assert APP_SP_ID, "app_sp_id parameter is required"
 assert WAREHOUSE_ID, "sql_warehouse_id parameter is required"
+
+# Resolve SP ID to display name
+from databricks.sdk import WorkspaceClient
+w = WorkspaceClient()
+sp = w.service_principals.get(id=APP_SP_ID)
+APP_SP = sp.display_name
 
 print(f"Catalog: {CATALOG}")
 print(f"Schema: {SCHEMA}")
-print(f"App SP: {APP_SP}")
+print(f"App SP: {APP_SP} (ID: {APP_SP_ID})")
 print(f"Warehouse: {WAREHOUSE_ID}")
 
 # COMMAND ----------

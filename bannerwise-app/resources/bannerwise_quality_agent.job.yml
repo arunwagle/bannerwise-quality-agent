@@ -53,8 +53,8 @@ resources:
           default: ${var.catalog_name}
         - name: schema_name
           default: ${var.schema_name}
-        - name: app_sp_name
-          default: ${var.app_sp_name}
+        - name: app_sp_id
+          default: ${resources.apps.bannerwise_quality_agent.id}
         - name: sql_warehouse_id
           default: ${var.sql_warehouse_id}
         - name: serving_endpoint_name
@@ -72,7 +72,7 @@ resources:
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
-              app_sp_name: '{{job.parameters.app_sp_name}}'
+              app_sp_id: '{{job.parameters.app_sp_id}}'
               sql_warehouse_id: '{{job.parameters.sql_warehouse_id}}'
 
         - task_key: configure_vs_access
@@ -80,7 +80,7 @@ resources:
           notebook_task:
             notebook_path: ../notebooks/access/setup_vs_access.py
             base_parameters:
-              app_sp_name: '{{job.parameters.app_sp_name}}'
+              app_sp_id: '{{job.parameters.app_sp_id}}'
               vs_endpoint_name: '{{job.parameters.vs_endpoint_name}}'
 
         - task_key: configure_endpoint_access
@@ -88,7 +88,7 @@ resources:
           notebook_task:
             notebook_path: ../notebooks/access/setup_endpoint_access.py
             base_parameters:
-              app_sp_name: '{{job.parameters.app_sp_name}}'
+              app_sp_id: '{{job.parameters.app_sp_id}}'
               serving_endpoint_name: '{{job.parameters.serving_endpoint_name}}'
               llm_endpoint_name: '{{job.parameters.llm_endpoint_name}}'
 
@@ -179,8 +179,8 @@ resources:
           default: '100'
         - name: rate_limit_period
           default: minute
-        - name: app_service_principal
-          default: ${var.app_sp_name}
+        - name: app_sp_id
+          default: ${resources.apps.bannerwise_quality_agent.id}
 
       tasks:
         - task_key: run_router_agent
@@ -241,7 +241,7 @@ resources:
               endpoint_name: '{{job.parameters.endpoint_name}}'
               workload_size: '{{job.parameters.workload_size}}'
               scale_to_zero: '{{job.parameters.scale_to_zero}}'
-              app_service_principal: '{{job.parameters.app_service_principal}}'
+              app_sp_id: '{{job.parameters.app_sp_id}}'
 
         - task_key: configure_ai_gateway
           description: 'Enable inference tables, usage tracking, and rate limits via AI Gateway'

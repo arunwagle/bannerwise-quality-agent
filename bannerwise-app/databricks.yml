@@ -23,9 +23,7 @@ variables:
   model_name:
     default: bannerwise_quality_router
     description: UC registered model name
-  app_sp_name:
-    default: ''
-    description: App service principal name (auto-created with app)
+
   confidence_threshold:
     default: '0.5'
     description: Confidence gate threshold for certified lane routing
@@ -39,15 +37,11 @@ targets:
     default: true
     workspace:
       host: https://fevm-aw-serverless-stable.cloud.databricks.com
-    variables:
-      app_sp_name: 'app-3hjyzw dev-bw-quality-agent'
   prod:
     mode: production
     workspace:
       host: https://fevm-aw-serverless-stable.cloud.databricks.com
       root_path: /Workspace/Users/arun.wagle@databricks.com/.bundle/${bundle.name}/${bundle.target}
-    variables:
-      app_sp_name: ''
     permissions:
       - user_name: arun.wagle@databricks.com
         level: CAN_MANAGE
