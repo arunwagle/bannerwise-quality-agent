@@ -16,7 +16,7 @@ def _get_router_service():
     if api_mode == "live":
         from services.live_router_service import assess_prompt
     else:
-        from services.mock_router_service import assess_prompt
+        from services.demo_router_service import assess_prompt
     return assess_prompt
 
 

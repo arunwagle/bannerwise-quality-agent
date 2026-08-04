@@ -1,7 +1,7 @@
 """Live Router Service — calls the Model Serving endpoint.
 
 Uses Databricks SDK for authentication (auto-configures in Apps runtime).
-Same interface as mock_router_service: assess_prompt(prompt) → dict
+Same interface as demo_router_service: assess_prompt(prompt) → dict
 """
 
 import os
