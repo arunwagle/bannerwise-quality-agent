@@ -377,6 +377,30 @@ body {
     box-shadow: var(--shadow);
 }
 
+.chip-certified {
+    border-color: #10b981;
+    background: #ecfdf5;
+    color: #065f46;
+}
+
+.chip-certified:hover {
+    background: #10b981;
+    border-color: #10b981;
+    color: white;
+}
+
+.chip-analytical {
+    border-color: #f59e0b;
+    background: #fffbeb;
+    color: #92400e;
+}
+
+.chip-analytical:hover {
+    background: #f59e0b;
+    border-color: #f59e0b;
+    color: white;
+}
+
 /* --- Buttons --- */
 .btn {
     padding: 0.65rem 1.4rem;
