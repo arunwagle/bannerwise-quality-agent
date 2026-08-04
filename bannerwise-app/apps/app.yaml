@@ -29,4 +29,4 @@ env:
   - name: 'LLM_ENDPOINT'
     value: 'databricks-meta-llama-3-3-70b-instruct'
   - name: 'GENIE_SPACE_ID'
-    value: ''  # Set after first bundle deploy creates the Genie Space
+    value: '01f19026d0e61c88b840ce168a9be672'
