@@ -63,10 +63,12 @@ resources:
           default: ${resources.vector_search_endpoints.bannerwise_vs_endpoint.id}
         - name: llm_endpoint_name
           default: ${var.judge_model}
+        - name: genie_space_id
+          default: ${resources.genie_spaces.bannerwise_analytics.id}
 
       tasks:
         - task_key: configure_uc_access
-          description: 'Setup app connectivity to Unity Catalog resources'
+          description: 'Setup app connectivity to Unity Catalog resources and Genie Space'
           notebook_task:
             notebook_path: ../notebooks/access/setup_uc_access.py
             base_parameters:
@@ -74,6 +76,7 @@ resources:
               schema_name: '{{job.parameters.schema_name}}'
               app_sp_id: '{{job.parameters.app_sp_id}}'
               sql_warehouse_id: '{{job.parameters.sql_warehouse_id}}'
+              genie_space_id: '{{job.parameters.genie_space_id}}'
 
         - task_key: configure_vs_access
           description: 'Setup app connectivity to Vector Search endpoint'

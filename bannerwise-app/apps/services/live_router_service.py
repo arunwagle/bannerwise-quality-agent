@@ -107,12 +107,22 @@ def assess_prompt(prompt: str) -> dict:
                 "latency_ms": total_latency,
             }
         else:
+            # Analytical Lane: forward to Genie Space for dynamic answer
+            from services.genie_service import query_genie_space
+
+            genie_result = query_genie_space(prompt)
+
             return {
-                "answer": None,
+                "answer": genie_result.get("answer"),
                 "badge": "Not Certified",
                 "confidence": round(confidence, 3),
                 "lane": "analytical",
+                "sql_executed": genie_result.get("sql_executed"),
                 "provenance": {
+                    "source": "genie_space",
+                    "genie_status": genie_result.get("status"),
+                    "sql_executed": genie_result.get("sql_executed"),
+                    "genie_error": genie_result.get("error"),
                     "corpus_id": corpus_id,
                     "matched_question": matched_question,
                     "vs_score": vs_score,
@@ -122,7 +132,7 @@ def assess_prompt(prompt: str) -> dict:
                     "candidates_evaluated": candidates_evaluated,
                     "endpoint": ENDPOINT_NAME,
                 },
-                "latency_ms": latency_ms,
+                "latency_ms": int((time.time() - start_time) * 1000),
             }
 
     except Exception as e:
