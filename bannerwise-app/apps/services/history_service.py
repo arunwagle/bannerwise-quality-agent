@@ -53,13 +53,51 @@ def get_history_stats() -> dict:
     w = _get_client()
     sql = f"""
     SELECT
-        COUNT(*) as total_queries,
-        SUM(CASE WHEN lane = 'certified' THEN 1 ELSE 0 END) as certified_count,
-        SUM(CASE WHEN lane = 'analytical' THEN 1 ELSE 0 END) as analytical_count,
-        ROUND(AVG(confidence), 3) as avg_confidence
+        COALESCE(COUNT(*), 0) as total_queries,
+        COALESCE(SUM(CASE WHEN lane = 'certified' THEN 1 ELSE 0 END), 0) as certified_count,
+        COALESCE(SUM(CASE WHEN lane = 'analytical' THEN 1 ELSE 0 END), 0) as analytical_count,
+        COALESCE(ROUND(AVG(confidence), 3), 0) as avg_confidence
     FROM {HISTORY_TABLE}
     """
     rows = _execute_sql(w, sql)
     if rows:
         return rows[0]
     return {"total_queries": 0, "certified_count": 0, "analytical_count": 0, "avg_confidence": 0}
+
+
+def log_query(entry: dict) -> None:
+    """Log a query to the history table after it's been processed."""
+    w = _get_client()
+    import uuid
+    from datetime import datetime
+
+    entry_id = f"H-{uuid.uuid4().hex[:8].upper()}"
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+
+    # Escape strings
+    prompt = (entry.get("prompt") or "").replace("'", "''")
+    lane = (entry.get("lane") or "analytical").replace("'", "''")
+    badge = (entry.get("badge") or "").replace("'", "''")
+    corpus_id = entry.get("corpus_id") or None
+    sql_executed = (entry.get("sql_executed") or "").replace("'", "''")
+    answer = (entry.get("answer") or "").replace("'", "''")
+    user_email = (entry.get("user_email") or "app_user").replace("'", "''")
+    confidence = entry.get("confidence", 0.0) or 0.0
+    latency_ms = entry.get("latency_ms", 0) or 0
+
+    corpus_val = f"'{corpus_id}'" if corpus_id else "NULL"
+
+    sql = f"""
+    INSERT INTO {HISTORY_TABLE}
+    (id, user_email, prompt, lane, confidence, badge, corpus_id, sql_executed, answer, latency_ms, timestamp)
+    VALUES (
+        '{entry_id}', '{user_email}', '{prompt}', '{lane}',
+        {confidence}, '{badge}', {corpus_val},
+        '{sql_executed}', '{answer}', {latency_ms}, '{now}'
+    )
+    """
+    try:
+        _execute_sql(w, sql)
+        logger.info(f"Logged query {entry_id} to history")
+    except Exception as e:
+        logger.error(f"Failed to log query to history: {e}")

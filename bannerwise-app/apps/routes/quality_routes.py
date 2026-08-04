@@ -1,7 +1,11 @@
 """Quality assessment routes — Ask page and API endpoint."""
 
 import os
+import logging
 from flask import Blueprint, render_template, request, jsonify, current_app
+from services.history_service import log_query
+
+logger = logging.getLogger(__name__)
 
 quality_bp = Blueprint('quality', __name__)
 
@@ -39,4 +43,21 @@ def api_assess():
 
     assess_prompt = _get_router_service()
     result = assess_prompt(data['prompt'])
+
+    # Log to query history (async-safe, won't block response on failure)
+    try:
+        log_query({
+            "prompt": data['prompt'],
+            "lane": result.get("lane"),
+            "confidence": result.get("confidence"),
+            "badge": result.get("badge"),
+            "corpus_id": result.get("corpus_id"),
+            "sql_executed": result.get("sql_executed", ""),
+            "answer": result.get("answer", ""),
+            "latency_ms": result.get("latency_ms", 0),
+            "user_email": "app_user",
+        })
+    except Exception as e:
+        logger.warning(f"Failed to log query history: {e}")
+
     return jsonify(result), 200
