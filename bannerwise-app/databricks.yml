@@ -1,5 +1,6 @@
 bundle:
   name: bannerwise_quality_agent
+  engine: direct  # Required for genie_spaces resource
 
 include:
   - resources/*.yml

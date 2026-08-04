@@ -1,0 +1,8 @@
+resources:
+  genie_spaces:
+    bannerwise_analytics:
+      title: 'Bannerwise Quality Analytics Genie Space'
+      description: 'AI-powered analytics space for Banner Health advertising data. Ask questions about ad spend, campaign performance, banner CTR, regional metrics, channel attribution, and creative engagement.'
+      warehouse_id: ${var.sql_warehouse_id}
+      parent_path: /Users/${workspace.current_user.userName}
+      file_path: ../src/genie/bannerwise_analytics.geniespace.json

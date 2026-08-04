@@ -427,9 +427,9 @@ resources:
         - name: sql_warehouse_id
           default: ${var.sql_warehouse_id}
         - name: genie_space_name
-          default: 'Bannerwise Quality Analytics'
+          default: 'Bannerwise Quality Analytics Genie Space'
         - name: space_id
-          default: ''
+          default: ${resources.genie_spaces.bannerwise_analytics.id}
 
       tasks:
         - task_key: build_genie_config

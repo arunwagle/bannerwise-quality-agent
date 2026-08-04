@@ -17,7 +17,7 @@
 dbutils.widgets.text("catalog_name", "aw_serverless_stable_catalog")
 dbutils.widgets.text("schema_name", "bannerhealth")
 dbutils.widgets.text("sql_warehouse_id", "2d8e531640ffa469")
-dbutils.widgets.text("genie_space_name", "Bannerwise Quality Analytics")
+dbutils.widgets.text("genie_space_name", "Bannerwise Quality Analytics Genie Space")
 
 CATALOG = dbutils.widgets.get("catalog_name")
 SCHEMA = dbutils.widgets.get("schema_name")

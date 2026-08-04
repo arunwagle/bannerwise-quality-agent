@@ -1,0 +1,474 @@
+{
+  "version": 2,
+  "config": {
+    "sample_questions": [
+      {
+        "id": "14d418a4a2494545953f7182988a6c5b",
+        "question": [
+          "What is the total ad spend for Q1 2025?"
+        ]
+      },
+      {
+        "id": "1ba152eb2ad94171b43a7b00686e73d6",
+        "question": [
+          "Which campaign has the highest spend?"
+        ]
+      },
+      {
+        "id": "2b3f570b652146a1806ee509e5a195bf",
+        "question": [
+          "How many impressions did the holiday campaign generate?"
+        ]
+      },
+      {
+        "id": "3ac21be963e945848738c18b319923f0",
+        "question": [
+          "What is the conversion rate for banner campaigns?"
+        ]
+      },
+      {
+        "id": "422e7ee762e34f27931e8a56bceb0686",
+        "question": [
+          "Show me the top 5 campaigns by revenue"
+        ]
+      },
+      {
+        "id": "4ffde8a36dc547e1b60b8728bdbacd93",
+        "question": [
+          "What is the click-through rate by banner size?"
+        ]
+      },
+      {
+        "id": "5060006cd35344ec9f3820096afce345",
+        "question": [
+          "Which banner sizes have the best engagement rate?"
+        ]
+      },
+      {
+        "id": "9ca083733eea48579b7d4a38ab62942c",
+        "question": [
+          "Show me the top performing banner creatives this quarter"
+        ]
+      },
+      {
+        "id": "b7d7e88103d74994bcd581d3f9cd80b3",
+        "question": [
+          "Which regions have the highest CPM?"
+        ]
+      },
+      {
+        "id": "bbe55937367846259d1a3691affbceeb",
+        "question": [
+          "Compare CPM across all regions"
+        ]
+      },
+      {
+        "id": "bd0d1ee2db13405f91bf11459e7ace36",
+        "question": [
+          "What is the cost per acquisition by channel?"
+        ]
+      },
+      {
+        "id": "ca322d4ebe1742f991afe4bdee911884",
+        "question": [
+          "What is the total revenue attributed to banner ads in Q1 2025?"
+        ]
+      },
+      {
+        "id": "ccbd2ad474184b3fb5ed1d43b3dfae0f",
+        "question": [
+          "Which channel drives the most attributed revenue?"
+        ]
+      },
+      {
+        "id": "d2ae49f819024e79bb64b44fbef636b0",
+        "question": [
+          "How does performance compare across ad networks?"
+        ]
+      },
+      {
+        "id": "f2ec0f5f43a5422482cbd907b526d0d7",
+        "question": [
+          "What is the average session duration from banner traffic?"
+        ]
+      }
+    ]
+  },
+  "data_sources": {
+    "tables": [
+      {
+        "identifier": "aw_serverless_stable_catalog.bannerhealth.ad_metrics",
+        "description": [
+          "Analytics table: ad_metrics"
+        ]
+      },
+      {
+        "identifier": "aw_serverless_stable_catalog.bannerhealth.attribution_metrics",
+        "description": [
+          "Analytics table: attribution_metrics"
+        ]
+      },
+      {
+        "identifier": "aw_serverless_stable_catalog.bannerhealth.banner_performance",
+        "description": [
+          "Analytics table: banner_performance"
+        ]
+      },
+      {
+        "identifier": "aw_serverless_stable_catalog.bannerhealth.campaign_metrics",
+        "description": [
+          "Analytics table: campaign_metrics"
+        ]
+      },
+      {
+        "identifier": "aw_serverless_stable_catalog.bannerhealth.channel_metrics",
+        "description": [
+          "Analytics table: channel_metrics"
+        ]
+      },
+      {
+        "identifier": "aw_serverless_stable_catalog.bannerhealth.creative_performance",
+        "description": [
+          "Analytics table: creative_performance"
+        ]
+      },
+      {
+        "identifier": "aw_serverless_stable_catalog.bannerhealth.network_metrics",
+        "description": [
+          "Analytics table: network_metrics"
+        ]
+      },
+      {
+        "identifier": "aw_serverless_stable_catalog.bannerhealth.regional_metrics",
+        "description": [
+          "Analytics table: regional_metrics"
+        ]
+      },
+      {
+        "identifier": "aw_serverless_stable_catalog.bannerhealth.session_metrics",
+        "description": [
+          "Analytics table: session_metrics"
+        ]
+      }
+    ]
+  },
+  "instructions": {
+    "text_instructions": [
+      {
+        "id": "d4febd36deaa47a3869c85ad76c2bcdc",
+        "content": [
+          "This Genie space provides natural-language access to Bannerwise advertising analytics.\nIt covers 9 tables in aw_serverless_stable_catalog.bannerhealth spanning ad spend, campaign performance, banner engagement,\nregional metrics, channel attribution, and creative performance.\n\nTABLES:\n  - aw_serverless_stable_catalog.bannerhealth.ad_metrics: Ad spend by period and campaign. Columns: period, spend, campaign_name\n  - aw_serverless_stable_catalog.bannerhealth.campaign_metrics: Campaign performance. Columns: campaign_name, campaign_type, campaign_id, impressions, clicks, conversions, revenue, spend, period\n  - aw_serverless_stable_catalog.bannerhealth.banner_performance: Banner creative performance. Columns: banner_size, ctr, engagement_rate, creative_id, creative_name, clicks, period\n  - aw_serverless_stable_catalog.bannerhealth.regional_metrics: CPM by region. Columns: region, cpm\n  - aw_serverless_stable_catalog.bannerhealth.channel_metrics: Cost per acquisition by channel. Columns: channel, spend, acquisitions\n  - aw_serverless_stable_catalog.bannerhealth.network_metrics: Ad network comparison. Columns: ad_network, impressions, ctr\n  - aw_serverless_stable_catalog.bannerhealth.session_metrics: Session duration by source. Columns: traffic_source, session_duration_sec\n  - aw_serverless_stable_catalog.bannerhealth.attribution_metrics: Revenue attribution by channel. Columns: channel, attributed_revenue, period\n  - aw_serverless_stable_catalog.bannerhealth.creative_performance: Creative-level clicks. Columns: creative_id, creative_name, clicks, period, banner_size\n\nKEY BUSINESS CONCEPTS:\n  - CTR (Click-Through Rate): clicks / impressions\n  - CPA (Cost Per Acquisition): spend / acquisitions\n  - CPM (Cost Per Mille): cost per 1000 impressions\n  - ROI: (revenue - spend) / spend\n  - Conversion Rate: conversions / clicks\n\nQUERY RULES:\n  1. Always use fully qualified table names: aw_serverless_stable_catalog.bannerhealth.<table>\n  2. Use standard SQL aggregations (SUM, AVG, COUNT)\n  3. For time-based analysis, filter/group by the 'period' column\n  4. For campaign analysis, join on campaign_name or campaign_id\n  5. When computing rates, handle division by zero with NULLIF"
+        ]
+      }
+    ],
+    "example_question_sqls": [
+      {
+        "id": "1cf6e48f688541cfa3a0dcaa4ea4f5d9",
+        "question": [
+          "What is the total ad spend for Q1 2025?"
+        ],
+        "sql": [
+          "SELECT SUM(spend) AS total_spend FROM aw_serverless_stable_catalog.bannerhealth.ad_metrics WHERE period = 'Q1 2025'"
+        ]
+      },
+      {
+        "id": "30b434b1b7a040008361873242f8d56c",
+        "question": [
+          "How many impressions did the holiday campaign generate?"
+        ],
+        "sql": [
+          "SELECT SUM(impressions) AS total_impressions FROM aw_serverless_stable_catalog.bannerhealth.campaign_metrics WHERE campaign_name = 'holiday'"
+        ]
+      },
+      {
+        "id": "36dc268c453b4c5a8c58b43fc186e7ee",
+        "question": [
+          "What is the click-through rate by banner size?"
+        ],
+        "sql": [
+          "SELECT banner_size, AVG(ctr) AS avg_ctr FROM aw_serverless_stable_catalog.bannerhealth.banner_performance GROUP BY banner_size ORDER BY avg_ctr DESC"
+        ]
+      },
+      {
+        "id": "3c9b6f25c9854ff297778b246bc13a95",
+        "question": [
+          "What is the conversion rate for banner campaigns?"
+        ],
+        "sql": [
+          "SELECT campaign_id, SUM(conversions) / NULLIF(SUM(clicks), 0) AS conversion_rate FROM aw_serverless_stable_catalog.bannerhealth.campaign_metrics WHERE campaign_type = 'banner' GROUP BY campaign_id"
+        ]
+      },
+      {
+        "id": "3dd50da7e3ed496d92717a36e9a9afcd",
+        "question": [
+          "Which regions have the highest CPM?"
+        ],
+        "sql": [
+          "SELECT region, cpm FROM aw_serverless_stable_catalog.bannerhealth.regional_metrics ORDER BY cpm DESC LIMIT 10"
+        ]
+      },
+      {
+        "id": "5c8aae3a9de54032b815307b54c15195",
+        "question": [
+          "What was the ROI for the summer campaign?"
+        ],
+        "sql": [
+          "SELECT (SUM(revenue) - SUM(spend)) / NULLIF(SUM(spend), 0) AS roi FROM aw_serverless_stable_catalog.bannerhealth.campaign_metrics WHERE campaign_name = 'summer'"
+        ]
+      },
+      {
+        "id": "5ed963b91cc7448288f3c9f6bef66449",
+        "question": [
+          "How does performance compare across ad networks?"
+        ],
+        "sql": [
+          "SELECT ad_network, impressions, ctr FROM aw_serverless_stable_catalog.bannerhealth.network_metrics ORDER BY ctr DESC"
+        ]
+      },
+      {
+        "id": "9d758c447cfb4ba1a60da602f71edd6d",
+        "question": [
+          "What is the cost per acquisition by channel?"
+        ],
+        "sql": [
+          "SELECT channel, spend / NULLIF(acquisitions, 0) AS cpa FROM aw_serverless_stable_catalog.bannerhealth.channel_metrics ORDER BY cpa ASC"
+        ]
+      },
+      {
+        "id": "a8ad6f36554c4f409c3b555179444eb8",
+        "question": [
+          "Show me the top performing banner creatives this quarter"
+        ],
+        "sql": [
+          "SELECT creative_name, banner_size, clicks FROM aw_serverless_stable_catalog.bannerhealth.banner_performance WHERE period = 'Q1 2025' ORDER BY clicks DESC LIMIT 10"
+        ]
+      },
+      {
+        "id": "ad8b40ebda8c425daa2c3f6ad7f52fb9",
+        "question": [
+          "What is the average session duration from banner traffic?"
+        ],
+        "sql": [
+          "SELECT traffic_source, AVG(session_duration_sec) AS avg_duration FROM aw_serverless_stable_catalog.bannerhealth.session_metrics GROUP BY traffic_source ORDER BY avg_duration DESC"
+        ]
+      },
+      {
+        "id": "b84b8c4a3f544a848602782af96f1c67",
+        "question": [
+          "What is the total revenue attributed to banner ads in Q1 2025?"
+        ],
+        "sql": [
+          "SELECT SUM(attributed_revenue) AS total_revenue FROM aw_serverless_stable_catalog.bannerhealth.attribution_metrics WHERE period = 'Q1 2025'"
+        ]
+      },
+      {
+        "id": "c32c838c1a4148f095519f8149d4866d",
+        "question": [
+          "Which channel drives the most attributed revenue?"
+        ],
+        "sql": [
+          "SELECT channel, SUM(attributed_revenue) AS total_rev FROM aw_serverless_stable_catalog.bannerhealth.attribution_metrics GROUP BY channel ORDER BY total_rev DESC"
+        ]
+      },
+      {
+        "id": "cbeb7efdb4a64c37b248db869b385b0c",
+        "question": [
+          "Which banner sizes have the best engagement rate?"
+        ],
+        "sql": [
+          "SELECT banner_size, AVG(engagement_rate) AS avg_engagement FROM aw_serverless_stable_catalog.bannerhealth.banner_performance GROUP BY banner_size ORDER BY avg_engagement DESC"
+        ]
+      },
+      {
+        "id": "f25a1c743431493685b3f56e6f2d2870",
+        "question": [
+          "Show me the top 5 campaigns by revenue"
+        ],
+        "sql": [
+          "SELECT campaign_name, SUM(revenue) AS total_revenue FROM aw_serverless_stable_catalog.bannerhealth.campaign_metrics GROUP BY campaign_name ORDER BY total_revenue DESC LIMIT 5"
+        ]
+      },
+      {
+        "id": "ffaa7f50a0714990a9acc8e6f1e5ff88",
+        "question": [
+          "How many unique creatives ran this period?"
+        ],
+        "sql": [
+          "SELECT COUNT(DISTINCT creative_id) AS unique_creatives, SUM(clicks) AS total_clicks FROM aw_serverless_stable_catalog.bannerhealth.creative_performance WHERE period = 'Q1 2025'"
+        ]
+      }
+    ]
+  },
+  "benchmarks": {
+    "questions": [
+      {
+        "id": "0047ec633f024241a707c2ea87f158cd",
+        "question": [
+          "Total advertising expenditure in Q1 2025"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT SUM(spend) AS total_spend FROM aw_serverless_stable_catalog.bannerhealth.ad_metrics WHERE period = 'Q1 2025'"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "38e765b2388048cd8614e5453a3da88a",
+        "question": [
+          "Number of impressions for the holiday campaign"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT SUM(impressions) AS total_impressions FROM aw_serverless_stable_catalog.bannerhealth.campaign_metrics WHERE campaign_name = 'holiday'"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "48fe27b0f9284244b440f35602d08e3a",
+        "question": [
+          "Average CTR broken down by banner dimensions"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT banner_size, AVG(ctr) AS avg_ctr FROM aw_serverless_stable_catalog.bannerhealth.banner_performance GROUP BY banner_size ORDER BY avg_ctr DESC"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "5aaf43e1589d43c481e0a21324586910",
+        "question": [
+          "Banner campaign conversion percentage"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT campaign_id, SUM(conversions) / NULLIF(SUM(clicks), 0) AS conversion_rate FROM aw_serverless_stable_catalog.bannerhealth.campaign_metrics WHERE campaign_type = 'banner' GROUP BY campaign_id"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "5b7caba6e87446f8bf6b7a49e1dce3c4",
+        "question": [
+          "Top regions ranked by cost per thousand impressions"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT region, cpm FROM aw_serverless_stable_catalog.bannerhealth.regional_metrics ORDER BY cpm DESC"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "8ea2df20eb4844279f9f8cd44e3fedeb",
+        "question": [
+          "Return on investment for the summer advertising campaign"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT (SUM(revenue) - SUM(spend)) / NULLIF(SUM(spend), 0) AS roi FROM aw_serverless_stable_catalog.bannerhealth.campaign_metrics WHERE campaign_name = 'summer'"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "a3a49a9e76bb433698071ded5e9d7d52",
+        "question": [
+          "Compare click-through rates by advertising network"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT ad_network, impressions, ctr FROM aw_serverless_stable_catalog.bannerhealth.network_metrics ORDER BY ctr DESC"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "a9880784ac3b44a8942bff2a47c28f97",
+        "question": [
+          "Customer acquisition cost per marketing channel"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT channel, spend / NULLIF(acquisitions, 0) AS cpa FROM aw_serverless_stable_catalog.bannerhealth.channel_metrics ORDER BY cpa ASC"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "ad2afcb49d664457b8ba4b3a9d6f70e0",
+        "question": [
+          "Best performing creatives by click volume this period"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT creative_name, banner_size, clicks FROM aw_serverless_stable_catalog.bannerhealth.banner_performance WHERE period = 'Q1 2025' ORDER BY clicks DESC LIMIT 10"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "b4525c34c4b3482a96c2e7a90fc18a16",
+        "question": [
+          "Average time spent on site from banner ad traffic"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT traffic_source, AVG(session_duration_sec) AS avg_duration FROM aw_serverless_stable_catalog.bannerhealth.session_metrics GROUP BY traffic_source ORDER BY avg_duration DESC"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "bdb9680162e44eae943333da35f10ca0",
+        "question": [
+          "Total attributed revenue from banner advertising Q1 2025"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT SUM(attributed_revenue) AS total_revenue FROM aw_serverless_stable_catalog.bannerhealth.attribution_metrics WHERE period = 'Q1 2025'"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "dee71983bda64ee8ad48ebaaca273e22",
+        "question": [
+          "Which marketing channel generates the highest revenue"
+        ],
+        "answer": [
+          {
+            "format": "SQL",
+            "content": [
+              "SELECT channel, SUM(attributed_revenue) AS total_rev FROM aw_serverless_stable_catalog.bannerhealth.attribution_metrics GROUP BY channel ORDER BY total_rev DESC"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
