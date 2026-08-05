@@ -6,6 +6,7 @@ before returning results to the user or the draft table.
 """
 
 import os
+import re
 import time
 import logging
 from databricks.sdk import WorkspaceClient
@@ -136,15 +137,48 @@ def _extract_result(msg_resp: dict) -> dict:
 
 
 def correct_sql(sql: str) -> str:
-    """Use LLM to validate and correct common SQL issues.
+    """Validate and correct common SQL issues from Genie-generated queries.
 
-    Fixes:
-    - Unquoted string literals (e.g., WHERE period = Q2 2025)
-    - Missing or mismatched quotes
-    - Basic syntax issues
-
-    Returns corrected SQL, or original if LLM call fails.
+    Uses fast regex-based fixes for known patterns first (no LLM needed),
+    then falls back to LLM for complex issues.
     """
+    corrected = _regex_fix_unquoted_strings(sql)
+    if corrected != sql:
+        logger.info("SQL corrected by regex (fixed unquoted string literals)")
+        return corrected
+    # If regex didn't find anything, try LLM as fallback
+    return _llm_correct_sql(sql)
+
+
+def _regex_fix_unquoted_strings(sql: str) -> str:
+    """Fast regex-based fix for unquoted string literals in SQL.
+
+    Detects: WHERE column = Q2 2025 AND ...
+    Fixes:   WHERE column = 'Q2 2025' AND ...
+    """
+    stop_words = r'(?:AND|OR|IS|NOT|NULL|IN|BETWEEN|EXISTS|LIKE|GROUP|ORDER|LIMIT|HAVING|ON|JOIN|WHERE|SET|FROM|INTO|SELECT|UNION|CASE|WHEN|THEN|ELSE|END|AS|TRUE|FALSE)'
+
+    pattern = (
+        r"((?:=|!=|<>)\s+)"
+        r"(?!')"
+        r"([A-Za-z][A-Za-z0-9]*"
+        r"(?:\s+(?!" + stop_words + r"\b)[A-Za-z0-9]+)*"
+        r")"
+        r"(?=\s+" + stop_words + r"\b|\s*[);,]|\s*$)"
+    )
+
+    def replace_match(match):
+        operator = match.group(1)
+        value = match.group(2).strip()
+        if ' ' not in value:
+            return match.group(0)
+        return f"{operator}'{value}'"
+
+    return re.sub(pattern, replace_match, sql, flags=re.IGNORECASE | re.MULTILINE)
+
+
+def _llm_correct_sql(sql: str) -> str:
+    """Fallback: use LLM to fix SQL issues not caught by regex."""
     w = _get_client()
 
     correction_prompt = f"""You are a Databricks SQL syntax validator. Review the following SQL query and fix ONLY syntax errors. Do NOT change the query logic, table names, column names, or add new clauses.

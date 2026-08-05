@@ -85,11 +85,23 @@ def api_corpus_submit_draft():
 
 @corpus_bp.route('/api/corpus/drafts/<entry_id>', methods=['GET'])
 def api_corpus_draft_detail(entry_id):
-    """API: Get a single draft entry by ID."""
+    """API: Get a single draft entry by ID.
+
+    Applies LLM SQL correction to fix Genie-generated issues
+    (unquoted strings, etc.) before returning to the UI.
+    """
     try:
         entry = get_draft_by_id(entry_id)
         if not entry:
             return jsonify({'error': 'Draft not found'}), 404
+
+        # Apply SQL correction for display (fixes unquoted strings, etc.)
+        if entry.get('parameterized_sql'):
+            try:
+                entry['parameterized_sql'] = correct_sql(entry['parameterized_sql'])
+            except Exception as e:
+                logger.warning(f"SQL correction failed for {entry_id}: {e}")
+
         return jsonify(entry), 200
     except Exception as e:
         logger.error(f"Failed to fetch draft {entry_id}: {e}")
