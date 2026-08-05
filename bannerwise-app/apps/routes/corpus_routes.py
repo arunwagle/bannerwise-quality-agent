@@ -7,6 +7,7 @@ which auto-syncs to the Vector Search index.
 
 import logging
 import os
+import re
 from flask import Blueprint, render_template, request, jsonify
 from services.corpus_service import (
     get_draft_entries,
@@ -16,6 +17,7 @@ from services.corpus_service import (
     certify_entry,
     reject_entry,
 )
+from services.genie_service import _correct_sql
 from databricks.sdk import WorkspaceClient
 
 logger = logging.getLogger(__name__)
