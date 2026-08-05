@@ -179,6 +179,41 @@ def submit_draft(
     }
 
 
+def _validate_sql(w, sql: str, parameters: list = None) -> None:
+    """Validate SQL syntax before certification using EXPLAIN.
+
+    Substitutes parameter placeholders (:param) with dummy values so that
+    EXPLAIN can parse the query. Raises ValueError if SQL is invalid.
+    """
+    test_sql = sql
+
+    # Replace :param placeholders with dummy string values for validation
+    if parameters:
+        for param in parameters:
+            if isinstance(param, str) and param.strip():
+                test_sql = test_sql.replace(f":{param}", "'__VALIDATION_PLACEHOLDER__'")
+
+    # Use EXPLAIN to validate without executing
+    explain_sql = f"EXPLAIN {test_sql}"
+    try:
+        response = w.statement_execution.execute_statement(
+            statement=explain_sql,
+            warehouse_id=SQL_WAREHOUSE_ID,
+            wait_timeout="15s",
+        )
+        if response.status.state != StatementState.SUCCEEDED:
+            error_msg = str(response.status.error) if response.status.error else "Unknown error"
+            raise ValueError(
+                f"SQL validation failed: {error_msg}"
+            )
+    except ValueError:
+        raise  # Re-raise our own ValueError
+    except Exception as e:
+        raise ValueError(f"SQL validation failed: {e}")
+
+    logger.info("SQL validation passed (EXPLAIN succeeded)")
+
+
 def certify_entry(entry_id: str, certified_by: str, modified_sql: str = None) -> dict:
     """Certify a draft entry — moves it from draft table to certified table.
 
@@ -191,6 +226,9 @@ def certify_entry(entry_id: str, certified_by: str, modified_sql: str = None) ->
 
     Returns:
         The certified entry dict.
+
+    Raises:
+        ValueError: If the draft is not found or the SQL fails validation.
     """
     w = _get_client()
 
@@ -202,7 +240,10 @@ def certify_entry(entry_id: str, certified_by: str, modified_sql: str = None) ->
     # Use modified SQL if provided, otherwise use the draft's SQL
     final_sql = modified_sql if modified_sql else draft["parameterized_sql"]
 
-    # 2. Generate a new certified ID
+    # 2. Validate SQL syntax before committing to certified table
+    _validate_sql(w, final_sql, draft.get("parameters", []))
+
+    # 3. Generate a new certified ID
     certified_id = f"QA-{uuid.uuid4().hex[:4].upper()}"
     now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
     review_date = (date.today() + timedelta(days=180)).isoformat()

@@ -113,7 +113,11 @@ def api_corpus_certify(entry_id):
         result = certify_entry(entry_id, certified_by=certified_by, modified_sql=modified_sql)
         return jsonify(result), 200
     except ValueError as e:
-        return jsonify({'error': str(e)}), 404
+        error_msg = str(e)
+        if "not found" in error_msg.lower():
+            return jsonify({'error': error_msg}), 404
+        # SQL validation failure — return 422 with details for UI display
+        return jsonify({'error': error_msg, 'validation_error': True}), 422
     except Exception as e:
         logger.error(f"Failed to certify {entry_id}: {e}")
         return jsonify({'error': str(e)}), 500
@@ -131,8 +135,9 @@ def api_corpus_run_query():
     if not sql:
         return jsonify({'error': 'No SQL query provided'}), 400
 
-    # Only allow SELECT queries for safety
-    if not sql.upper().startswith('SELECT'):
+    # Only allow read-only queries for safety (SELECT or WITH...SELECT)
+    sql_upper = sql.upper().lstrip()
+    if not (sql_upper.startswith('SELECT') or sql_upper.startswith('WITH')):
         return jsonify({'error': 'Only SELECT queries are allowed'}), 400
 
     try:
