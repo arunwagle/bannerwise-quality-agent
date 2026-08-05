@@ -15,7 +15,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install mlflow>=2.20.2 databricks-agents>=0.16.0 databricks-vectorsearch openai jinja2
+# MAGIC %pip install mlflow>=2.20.2 databricks-agents>=0.16.0 databricks-vectorsearch databricks-sdk jinja2
 # MAGIC %restart_python
 
 # COMMAND ----------
@@ -220,7 +220,7 @@ def short_circuit_check(candidates: List[Candidate]) -> Optional[RouterResult]:
 
 # DBTITLE 1,Step 3 — Rerank / Calibrate (LLM Judge)
 import json
-from openai import OpenAI
+from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
 
 
 @mlflow.trace(name="router.rerank", span_type=SpanType.LLM)
@@ -258,15 +258,15 @@ Certified template: "{candidate.question}"
 
 Answer with ONLY one word: MATCH or NO_MATCH"""
 
-    # Use WorkspaceClient for auth (works in both notebooks AND Model Serving)
+    # Use Databricks SDK serving_endpoints.query() — handles all auth types
+    # (serverless, clusters, Model Serving) without needing explicit tokens
     w = WorkspaceClient()
-    client = OpenAI(api_key=w.config.token, base_url=f"{w.config.host}/serving-endpoints")
     try:
-        response = client.chat.completions.create(
-            model=JUDGE_MODEL,
-            messages=[{"role": "user", "content": judge_prompt}],
+        response = w.serving_endpoints.query(
+            name=JUDGE_MODEL,
+            messages=[ChatMessage(role=ChatMessageRole.USER, content=judge_prompt)],
             temperature=0.0,
-            max_tokens=10
+            max_tokens=10,
         )
         llm_response = response.choices[0].message.content.strip()
     except Exception as e:
@@ -406,16 +406,16 @@ Return ONLY a JSON object mapping parameter names to their extracted values.
 If a parameter value is not found in the question, use a reasonable default.
 Example: {{"period": "Q1 2025", "campaign": "spring_sale"}}"""
 
-    # Use WorkspaceClient for auth (works in both notebooks AND Model Serving)
+    # Use Databricks SDK serving_endpoints.query() — handles all auth types
+    # (serverless, clusters, Model Serving) without needing explicit tokens
     w = WorkspaceClient()
-    client = OpenAI(api_key=w.config.token, base_url=f"{w.config.host}/serving-endpoints")
 
     try:
-        response = client.chat.completions.create(
-            model=JUDGE_MODEL,
-            messages=[{"role": "user", "content": extraction_prompt}],
+        response = w.serving_endpoints.query(
+            name=JUDGE_MODEL,
+            messages=[ChatMessage(role=ChatMessageRole.USER, content=extraction_prompt)],
             temperature=0.0,
-            max_tokens=200
+            max_tokens=200,
         )
         content = response.choices[0].message.content.strip()
         if content.startswith("```"):
@@ -512,9 +512,6 @@ def _format_answer(
 
 # COMMAND ----------
 
-import requests
-
-
 @mlflow.trace(name="router.analytical_lane", span_type=SpanType.CHAIN)
 def execute_analytical_lane(
     prompt: str,
@@ -566,26 +563,18 @@ def execute_analytical_lane(
 
 @mlflow.trace(name="router.genie_call", span_type=SpanType.TOOL)
 def _call_genie(prompt: str) -> Dict[str, str]:
-    """Call the Genie Conversation API and poll for results."""
+    """Call the Genie Conversation API and poll for results.
+    Uses w.api_client.do() for auth (handles serverless, clusters, Model Serving).
+    """
     w = WorkspaceClient()
-    host = w.config.host
-    token = w.config.token
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
 
     # Start conversation
     try:
-        resp = requests.post(
-            f"{host}/api/2.0/genie/spaces/{GENIE_SPACE_ID}/start-conversation",
-            headers=headers,
-            json={"content": prompt},
-            timeout=GENIE_TIMEOUT_SEC
+        conv_data = w.api_client.do(
+            "POST",
+            f"/api/2.0/genie/spaces/{GENIE_SPACE_ID}/start-conversation",
+            body={"content": prompt},
         )
-        resp.raise_for_status()
-        conv_data = resp.json()
         conversation_id = conv_data.get("conversation_id", "")
         message_id = conv_data.get("message_id", "")
     except Exception as e:
@@ -602,13 +591,10 @@ def _call_genie(prompt: str) -> Dict[str, str]:
         time.sleep(2)
         poll_count += 1
         try:
-            msg_resp = requests.get(
-                f"{host}/api/2.0/genie/spaces/{GENIE_SPACE_ID}/conversations/{conversation_id}/messages/{message_id}",
-                headers=headers,
-                timeout=10
+            msg_data = w.api_client.do(
+                "GET",
+                f"/api/2.0/genie/spaces/{GENIE_SPACE_ID}/conversations/{conversation_id}/messages/{message_id}",
             )
-            msg_resp.raise_for_status()
-            msg_data = msg_resp.json()
             status = msg_data.get("status", "")
 
             if status == "COMPLETED":
