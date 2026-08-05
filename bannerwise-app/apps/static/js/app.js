@@ -339,6 +339,86 @@ async function rejectEntry(entryId) {
 }
 
 // ============================================================
+// DEMO PAGE
+// ============================================================
+
+function switchDemoTab(tabName) {
+    document.querySelectorAll('.demo-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
+    document.querySelectorAll('.demo-panel').forEach(panel => {
+        panel.classList.toggle('hidden', panel.id !== `panel-${tabName}`);
+    });
+}
+
+async function runDemoSingle(btn, query) {
+    const card = btn.closest('.demo-card');
+    const resultDiv = card.querySelector('.demo-result');
+    resultDiv.classList.remove('hidden');
+    resultDiv.innerHTML = '<div class="demo-loading"><div class="spinner-sm"></div> Running...</div>';
+    btn.disabled = true;
+
+    try {
+        const result = await apiPost('/api/quality/assess', { prompt: query });
+        resultDiv.innerHTML = renderDemoResult(result);
+    } catch (err) {
+        resultDiv.innerHTML = `<div class="demo-error">Error: ${escapeHtml(err.message)}</div>`;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function runDemoPair(btn) {
+    const pair = btn.closest('.demo-pair');
+    const cards = pair.querySelectorAll('.demo-card');
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+
+    const promises = Array.from(cards).map(async (card) => {
+        const query = card.dataset.query;
+        const resultDiv = card.querySelector('.demo-result');
+        resultDiv.classList.remove('hidden');
+        resultDiv.innerHTML = '<div class="demo-loading"><div class="spinner-sm"></div> Running...</div>';
+
+        try {
+            const result = await apiPost('/api/quality/assess', { prompt: query });
+            resultDiv.innerHTML = renderDemoResult(result);
+        } catch (err) {
+            resultDiv.innerHTML = `<div class="demo-error">Error: ${escapeHtml(err.message)}</div>`;
+        }
+    });
+
+    await Promise.all(promises);
+    btn.disabled = false;
+    btn.textContent = 'Run Both & Compare';
+}
+
+function renderDemoResult(result) {
+    const badgeClass = result.lane === 'certified' ? 'badge-certified' : 'badge-analytical';
+    const badge = result.lane === 'certified' ? '\u2705 Certified' : '\u26A0\uFE0F Not Certified';
+    const confidence = (result.confidence * 100).toFixed(1);
+    const latency = result.latency_ms || 0;
+    const corpusId = result.provenance?.corpus_id || '\u2014';
+    const vsScore = result.provenance?.vs_score ? (result.provenance.vs_score * 100).toFixed(1) + '%' : '\u2014';
+    const sqlExecuted = result.provenance?.sql_executed || result.sql_executed || '';
+
+    return `
+        <div class="demo-result-card">
+            <div class="demo-result-header">
+                <span class="badge ${badgeClass}">${badge}</span>
+                <span class="demo-meta">Confidence: ${confidence}% | Latency: ${latency}ms</span>
+            </div>
+            <div class="demo-result-provenance">
+                <span><strong>Corpus ID:</strong> ${corpusId}</span>
+                <span><strong>VS Score:</strong> ${vsScore}</span>
+            </div>
+            ${sqlExecuted ? `<div class="demo-result-sql"><code>${escapeHtml(sqlExecuted)}</code></div>` : ''}
+            <div class="demo-result-answer">${formatAnswer(result.answer)}</div>
+        </div>
+    `;
+}
+
+// ============================================================
 // ADMIN PAGE
 // ============================================================
 

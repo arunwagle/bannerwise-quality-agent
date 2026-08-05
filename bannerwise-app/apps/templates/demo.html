@@ -1,0 +1,205 @@
+{% extends "layout.html" %}
+{% block title %}Demo — Bannerwise Quality Agent{% endblock %}
+
+{% block content %}
+<div class="page-demo">
+    <div class="page-header">
+        <h2 class="page-title">Demo Scenarios</h2>
+        <p class="page-subtitle">Test the confidence gate routing across 4 scenarios</p>
+    </div>
+
+    <!-- Scenario Tabs -->
+    <div class="demo-tabs">
+        <button class="demo-tab active" data-tab="exact" onclick="switchDemoTab('exact')">Exact Match</button>
+        <button class="demo-tab" data-tab="parameterized" onclick="switchDemoTab('parameterized')">Parameterized</button>
+        <button class="demo-tab" data-tab="semantic" onclick="switchDemoTab('semantic')">Semantic Match</button>
+        <button class="demo-tab" data-tab="analytics" onclick="switchDemoTab('analytics')">Analytics (Genie)</button>
+    </div>
+
+    <!-- Tab: Exact Match -->
+    <div class="demo-panel" id="panel-exact">
+        <div class="demo-description">
+            <h3>Exact Match Queries</h3>
+            <p>These questions match certified corpus entries verbatim. They route through the <strong>certified lane</strong> and return pre-approved answers instantly.</p>
+        </div>
+        <div class="demo-scenarios">
+            <div class="demo-card">
+                <div class="demo-query">What is the click-through rate by banner size?</div>
+                <button class="btn btn-primary btn-sm" onclick="runDemoSingle(this, 'What is the click-through rate by banner size?')">Run</button>
+                <div class="demo-result hidden"></div>
+            </div>
+            <div class="demo-card">
+                <div class="demo-query">Which regions have the highest CPM?</div>
+                <button class="btn btn-primary btn-sm" onclick="runDemoSingle(this, 'Which regions have the highest CPM?')">Run</button>
+                <div class="demo-result hidden"></div>
+            </div>
+            <div class="demo-card">
+                <div class="demo-query">What is the cost per acquisition by channel?</div>
+                <button class="btn btn-primary btn-sm" onclick="runDemoSingle(this, 'What is the cost per acquisition by channel?')">Run</button>
+                <div class="demo-result hidden"></div>
+            </div>
+            <div class="demo-card">
+                <div class="demo-query">What is the conversion rate for banner campaigns?</div>
+                <button class="btn btn-primary btn-sm" onclick="runDemoSingle(this, 'What is the conversion rate for banner campaigns?')">Run</button>
+                <div class="demo-result hidden"></div>
+            </div>
+            <div class="demo-card">
+                <div class="demo-query">How does performance compare across ad networks?</div>
+                <button class="btn btn-primary btn-sm" onclick="runDemoSingle(this, 'How does performance compare across ad networks?')">Run</button>
+                <div class="demo-result hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Parameterized -->
+    <div class="demo-panel hidden" id="panel-parameterized">
+        <div class="demo-description">
+            <h3>Parameterized Queries</h3>
+            <p>Same SQL template, different parameters. Both route to <strong>certified lane</strong> and execute the same SQL with different parameter values. Compare results side-by-side.</p>
+        </div>
+        <div class="demo-scenarios">
+            <div class="demo-pair">
+                <div class="demo-pair-header">
+                    <span class="demo-pair-label">Template: "What is the total ad spend for {period}?"</span>
+                    <button class="btn btn-primary btn-sm" onclick="runDemoPair(this)">Run Both &amp; Compare</button>
+                </div>
+                <div class="demo-pair-cards">
+                    <div class="demo-card" data-query="What is the total ad spend for Q1 2025?">
+                        <div class="demo-query">What is the total ad spend for <strong>Q1 2025</strong>?</div>
+                        <div class="demo-result hidden"></div>
+                    </div>
+                    <div class="demo-card" data-query="What is the total ad spend for Q2 2025?">
+                        <div class="demo-query">What is the total ad spend for <strong>Q2 2025</strong>?</div>
+                        <div class="demo-result hidden"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="demo-pair">
+                <div class="demo-pair-header">
+                    <span class="demo-pair-label">Template: "What was the ROI for the {campaign} campaign?"</span>
+                    <button class="btn btn-primary btn-sm" onclick="runDemoPair(this)">Run Both &amp; Compare</button>
+                </div>
+                <div class="demo-pair-cards">
+                    <div class="demo-card" data-query="What was the ROI for the summer campaign?">
+                        <div class="demo-query">What was the ROI for the <strong>summer</strong> campaign?</div>
+                        <div class="demo-result hidden"></div>
+                    </div>
+                    <div class="demo-card" data-query="What was the ROI for the holiday campaign?">
+                        <div class="demo-query">What was the ROI for the <strong>holiday</strong> campaign?</div>
+                        <div class="demo-result hidden"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="demo-pair">
+                <div class="demo-pair-header">
+                    <span class="demo-pair-label">Template: "How many impressions did the {campaign} campaign generate?"</span>
+                    <button class="btn btn-primary btn-sm" onclick="runDemoPair(this)">Run Both &amp; Compare</button>
+                </div>
+                <div class="demo-pair-cards">
+                    <div class="demo-card" data-query="How many impressions did the holiday campaign generate?">
+                        <div class="demo-query">How many impressions did the <strong>holiday</strong> campaign generate?</div>
+                        <div class="demo-result hidden"></div>
+                    </div>
+                    <div class="demo-card" data-query="How many impressions did the summer campaign generate?">
+                        <div class="demo-query">How many impressions did the <strong>summer</strong> campaign generate?</div>
+                        <div class="demo-result hidden"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Semantic Match -->
+    <div class="demo-panel hidden" id="panel-semantic">
+        <div class="demo-description">
+            <h3>Semantic Match — Same Question, Different Wording</h3>
+            <p>Both questions in each pair mean the same thing but are worded differently. The vector search + LLM judge should route both to the <strong>same corpus entry</strong>. Compare the <code>corpus_id</code> in provenance.</p>
+        </div>
+        <div class="demo-scenarios">
+            <div class="demo-pair">
+                <div class="demo-pair-header">
+                    <span class="demo-pair-label">Corpus: QA-0005 — Regional CPM comparison</span>
+                    <button class="btn btn-primary btn-sm" onclick="runDemoPair(this)">Run Both &amp; Compare</button>
+                </div>
+                <div class="demo-pair-cards">
+                    <div class="demo-card" data-query="Which regions have the highest CPM?">
+                        <div class="demo-query">Which regions have the highest CPM?</div>
+                        <div class="demo-result hidden"></div>
+                    </div>
+                    <div class="demo-card" data-query="Compare CPM across all regions">
+                        <div class="demo-query">Compare CPM across all regions</div>
+                        <div class="demo-result hidden"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="demo-pair">
+                <div class="demo-pair-header">
+                    <span class="demo-pair-label">Corpus: QA-0008 — Channel acquisition cost</span>
+                    <button class="btn btn-primary btn-sm" onclick="runDemoPair(this)">Run Both &amp; Compare</button>
+                </div>
+                <div class="demo-pair-cards">
+                    <div class="demo-card" data-query="What is the cost per acquisition by channel?">
+                        <div class="demo-query">What is the cost per acquisition by channel?</div>
+                        <div class="demo-result hidden"></div>
+                    </div>
+                    <div class="demo-card" data-query="How much does each channel cost per customer?">
+                        <div class="demo-query">How much does each channel cost per customer?</div>
+                        <div class="demo-result hidden"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="demo-pair">
+                <div class="demo-pair-header">
+                    <span class="demo-pair-label">Corpus: QA-0003 — Click-through rate by size</span>
+                    <button class="btn btn-primary btn-sm" onclick="runDemoPair(this)">Run Both &amp; Compare</button>
+                </div>
+                <div class="demo-pair-cards">
+                    <div class="demo-card" data-query="What is the click-through rate by banner size?">
+                        <div class="demo-query">What is the click-through rate by banner size?</div>
+                        <div class="demo-result hidden"></div>
+                    </div>
+                    <div class="demo-card" data-query="Show me CTR broken down by banner dimensions">
+                        <div class="demo-query">Show me CTR broken down by banner dimensions</div>
+                        <div class="demo-result hidden"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Analytics -->
+    <div class="demo-panel hidden" id="panel-analytics">
+        <div class="demo-description">
+            <h3>Analytics Queries (Genie Agent)</h3>
+            <p>These questions don't match any certified corpus entry. They route to the <strong>Genie Agent</strong> which generates SQL dynamically. Results show "Not Certified" badge.</p>
+        </div>
+        <div class="demo-scenarios">
+            <div class="demo-card">
+                <div class="demo-query">Show me campaign performance trends over time</div>
+                <button class="btn btn-primary btn-sm" onclick="runDemoSingle(this, 'Show me campaign performance trends over time')">Run</button>
+                <div class="demo-result hidden"></div>
+            </div>
+            <div class="demo-card">
+                <div class="demo-query">Which campaign had the highest ROI this year?</div>
+                <button class="btn btn-primary btn-sm" onclick="runDemoSingle(this, 'Which campaign had the highest ROI this year?')">Run</button>
+                <div class="demo-result hidden"></div>
+            </div>
+            <div class="demo-card">
+                <div class="demo-query">What is the revenue by channel for Q2 2025?</div>
+                <button class="btn btn-primary btn-sm" onclick="runDemoSingle(this, 'What is the revenue by channel for Q2 2025?')">Run</button>
+                <div class="demo-result hidden"></div>
+            </div>
+            <div class="demo-card">
+                <div class="demo-query">Compare CTR across all ad networks</div>
+                <button class="btn btn-primary btn-sm" onclick="runDemoSingle(this, 'Compare CTR across all ad networks')">Run</button>
+                <div class="demo-result hidden"></div>
+            </div>
+            <div class="demo-card">
+                <div class="demo-query">What are the top 5 creatives by clicks in Q1 2025?</div>
+                <button class="btn btn-primary btn-sm" onclick="runDemoSingle(this, 'What are the top 5 creatives by clicks in Q1 2025?')">Run</button>
+                <div class="demo-result hidden"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

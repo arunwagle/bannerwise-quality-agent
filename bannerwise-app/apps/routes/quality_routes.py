@@ -27,6 +27,12 @@ def ask_page():
     return render_template('ask.html', api_mode=api_mode)
 
 
+@quality_bp.route('/demo')
+def demo_page():
+    """Render the Demo Scenarios page."""
+    return render_template('demo.html')
+
+
 @quality_bp.route('/api/quality/assess', methods=['POST'])
 def api_assess():
     """API: Assess a user prompt through the confidence gate.
