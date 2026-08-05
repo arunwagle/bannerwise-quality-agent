@@ -133,3 +133,64 @@ def _extract_result(msg_resp: dict) -> dict:
         "status": "success",
         "error": None,
     }
+
+
+def correct_sql(sql: str) -> str:
+    """Use LLM to validate and correct common SQL issues.
+
+    Fixes:
+    - Unquoted string literals (e.g., WHERE period = Q2 2025)
+    - Missing or mismatched quotes
+    - Basic syntax issues
+
+    Returns corrected SQL, or original if LLM call fails.
+    """
+    w = _get_client()
+
+    correction_prompt = f"""You are a Databricks SQL syntax validator. Review the following SQL query and fix ONLY syntax errors. Do NOT change the query logic, table names, column names, or add new clauses.
+
+Common issues to fix:
+1. Unquoted string literals in WHERE clauses (e.g., WHERE period = Q2 2025 should be WHERE period = 'Q2 2025')
+2. Unquoted string values in comparisons
+3. Missing single quotes around date/text values
+
+Rules:
+- Return ONLY the corrected SQL, nothing else
+- Do NOT add comments, explanations, or markdown formatting
+- Do NOT change table names, column names, aliases, or query structure
+- Do NOT add LIMIT, ORDER BY, or any new clauses
+- If the SQL is already correct, return it unchanged
+
+SQL to validate:
+{sql}
+
+Corrected SQL:"""
+
+    try:
+        response = w.serving_endpoints.query(
+            name=LLM_ENDPOINT,
+            messages=[ChatMessage(role=ChatMessageRole.USER, content=correction_prompt)],
+            temperature=0.0,
+            max_tokens=2000,
+        )
+        corrected = response.choices[0].message.content.strip()
+
+        # Remove markdown code fences if LLM wraps the response
+        if corrected.startswith("```"):
+            lines = corrected.split("\n")
+            lines = [l for l in lines if not l.strip().startswith("```")]
+            corrected = "\n".join(lines).strip()
+
+        # Sanity check: corrected SQL should still be a SELECT/WITH statement
+        corrected_upper = corrected.upper().lstrip()
+        if corrected_upper.startswith("SELECT") or corrected_upper.startswith("WITH"):
+            if corrected != sql:
+                logger.info("SQL corrected by LLM (original had issues)")
+            return corrected
+        else:
+            logger.warning("LLM SQL correction returned non-SQL output, keeping original")
+            return sql
+
+    except Exception as e:
+        logger.warning(f"SQL correction LLM call failed (using original): {e}")
+        return sql
