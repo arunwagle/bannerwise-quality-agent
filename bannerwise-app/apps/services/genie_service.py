@@ -1,13 +1,20 @@
-"""Genie Space Service — queries the Genie Space API for analytical answers."""
+"""Genie Space Service — queries the Genie Space API for analytical answers.
+
+Includes an LLM-based SQL correction step that validates and fixes common
+issues in Genie-generated SQL (unquoted strings, missing aliases, etc.)
+before returning results to the user or the draft table.
+"""
 
 import os
 import time
 import logging
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
 
 logger = logging.getLogger(__name__)
 
 GENIE_SPACE_ID = os.environ.get("GENIE_SPACE_ID", "")
+LLM_ENDPOINT = os.environ.get("LLM_ENDPOINT", "databricks-meta-llama-3-3-70b-instruct")
 MAX_POLL_SECONDS = 60
 POLL_INTERVAL = 2
 
