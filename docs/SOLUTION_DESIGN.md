@@ -3,7 +3,7 @@
 ## 1. Architecture Overview
 
 <!-- Diagram: docs/diagrams/01_architecture_overview.drawio -->
-![Architecture Overview](diagrams/01_architecture_overview.png)
+![Architecture Overview](diagrams/01_architecture_overview_fixed.png)
 
 ---
 
@@ -119,7 +119,7 @@ The binary approach is simple, predictable, and easy to explain. The quality con
 When the gate says YES, the certified lane executes the pre-approved SQL with extracted parameters.
 
 <!-- Diagram: docs/diagrams/02_certified_lane_flow.drawio -->
-![Certified Lane Flow](diagrams/02_certified_lane_flow.png)
+![Certified Lane Flow](diagrams/02_certified_lane_flow.drawio.png)
 
 **LLM Endpoint**: `databricks-meta-llama-3-3-70b-instruct` (for parameter extraction and answer formatting)
 
@@ -130,7 +130,7 @@ When the gate says YES, the certified lane executes the pre-approved SQL with ex
 When the gate says NO, the analytical lane forwards to the Genie Space for dynamic SQL generation.
 
 <!-- Diagram: docs/diagrams/03_analytical_lane_flow.drawio -->
-![Analytical Lane Flow](diagrams/03_analytical_lane_flow.png)
+![Analytical Lane Flow](diagrams/03_analytical_lane_flow.drawio.png)
 
 **Genie Space Configuration:**
 - 9 analytics tables registered
@@ -177,7 +177,7 @@ This ensures the SME Review page always shows syntactically valid SQL, and "Run 
 The certification flywheel is the mechanism by which the system self-improves over time. Each uncertified answer is an opportunity to expand the certified corpus.
 
 <!-- Diagram: docs/diagrams/04_certification_flywheel.drawio -->
-![Certification Flywheel](diagrams/04_certification_flywheel.png)
+![Certification Flywheel](diagrams/04_certification_flywheel.drawio.png)
 
 **Key design decisions:**
 - CDF must remain enabled on `certified_qa_corpus` for Delta Sync to work
@@ -197,7 +197,7 @@ The certification flywheel is the mechanism by which the system self-improves ov
 The jobs must be run in sequence for a fresh deployment:
 
 <!-- Diagram: docs/diagrams/05_deployment_order.drawio -->
-![Deployment Order](diagrams/05_deployment_order.png)
+![Deployment Order](diagrams/05_deployment_order.drawio.png)
 
 ---
 
@@ -395,7 +395,7 @@ class RouterAgent(mlflow.pyfunc.PythonModel):
 ### Model Registration Flow
 
 <!-- Diagram: docs/diagrams/06_model_registration_flow.drawio -->
-![Model Registration Flow](diagrams/06_model_registration_flow.png)
+![Model Registration Flow](diagrams/06_model_registration_flow.drawio.png)
 
 ### Model Versioning Strategy
 
