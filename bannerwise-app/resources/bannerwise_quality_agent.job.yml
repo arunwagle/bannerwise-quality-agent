@@ -78,12 +78,14 @@ resources:
               sql_warehouse_id: '{{job.parameters.sql_warehouse_id}}'
 
         - task_key: configure_vs_access
-          description: 'Setup app connectivity to Vector Search endpoint'
+          description: 'Setup app + model serving connectivity to Vector Search endpoint and index'
           notebook_task:
             notebook_path: ../notebooks/access/setup_vs_access.py
             base_parameters:
               app_sp_id: '{{job.parameters.app_sp_id}}'
               vs_endpoint_name: '{{job.parameters.vs_endpoint_name}}'
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
 
         - task_key: configure_endpoint_access
           description: 'Setup app connectivity to model serving endpoints'

@@ -383,17 +383,21 @@ Order matters: remove downstream consumers before deleting upstream resources.
 
 The app runs as a Databricks App with an automatically provisioned service principal. All access is granted to this SP — no user credentials are used at runtime.
 
-| Permission | Target | API / Method |
-| --- | --- | --- |
-| USE CATALOG | `aw_serverless_stable_catalog` | SQL GRANT |
-| USE SCHEMA | `bannerhealth` | SQL GRANT |
-| SELECT | All tables in schema | SQL GRANT |
-| MODIFY | Schema (for INSERT into history/draft) | SQL GRANT |
-| CAN_USE | SQL Warehouse `2d8e531640ffa469` | PATCH `/permissions/warehouses/{id}` |
-| CAN_USE | VS endpoint `bannerwise-vs-endpoint` | PATCH `/permissions/vector-search-endpoints/{id}` |
-| CAN_QUERY | Serving endpoint `bannerwise-quality-router` | PATCH `/permissions/serving-endpoints/{id}` |
-| CAN_QUERY | LLM endpoint `databricks-meta-llama-3-3-70b-instruct` | PATCH `/permissions/serving-endpoints/{id}` |
-| CAN_RUN | Genie Space `01f19026d0e61c88b840ce168a9be672` | PATCH `/permissions/genie/{id}` |
+| Permission | Target | Principal | API / Method |
+| --- | --- | --- | --- |
+| USE CATALOG | `aw_serverless_stable_catalog` | App SP | SQL GRANT |
+| USE SCHEMA | `bannerhealth` | App SP | SQL GRANT |
+| SELECT | All tables in schema | App SP | SQL GRANT |
+| MODIFY | Schema (for INSERT into history/draft) | App SP | SQL GRANT |
+| CAN_USE | SQL Warehouse `2d8e531640ffa469` | App SP | PATCH `/permissions/warehouses/{id}` |
+| CAN_USE | VS endpoint `bannerwise-vs-endpoint` | App SP | PATCH `/permissions/vector-search-endpoints/{id}` |
+| CAN_QUERY | Serving endpoint `bannerwise-quality-router` | App SP | PATCH `/permissions/serving-endpoints/{id}` |
+| CAN_QUERY | LLM endpoint `databricks-meta-llama-3-3-70b-instruct` | App SP | PATCH `/permissions/serving-endpoints/{id}` |
+| CAN_RUN | Genie Space `01f19026d0e61c88b840ce168a9be672` | App SP | PATCH `/permissions/genie/{id}` |
+| SELECT | VS Index `certified_qa_index` | Model Serving | SQL GRANT TO `system-model-serving` |
+| CAN_USE | VS endpoint `bannerwise-vs-endpoint` | Model Serving | PATCH (via `users` group) |
+
+> **Critical Note:** The Model Serving endpoint (`bannerwise-quality-router`) uses `auth_type=model-serving` — a system-managed identity **separate from the App SP**. It needs its own explicit grants on UC securables. These grants are **lost when the VS index is deleted and recreated** and must be re-applied via the `setup_access_job`.
 
 ### Permission Resolution
 
