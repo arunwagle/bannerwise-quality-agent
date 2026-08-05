@@ -243,6 +243,7 @@ SME opens Review page → sees question + SQL + answer
 - Test data uses TRUNCATE + append (not `mode("overwrite")`) to preserve CDF
 - Certified entries get a 180-day `next_review_date` (staleness gate)
 - The Review page allows SQL modification before certification (SME can fix the query)
+- **SQL validation gate**: Before certification, `EXPLAIN` is run against the SQL to catch syntax errors (e.g., malformed regex, unquoted literals). Parameter placeholders (`:param`) are substituted with dummy values for validation. If validation fails, certify returns HTTP 422 with the error — the entry remains in draft.
 
 ---
 
