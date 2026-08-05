@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <mxfile host="app.diagrams.net" modified="2025-01-01T00:00:00.000Z" agent="Genie" version="24.0.0">
-  <diagram name="Architecture Overview" id="arch-full">
-    <mxGraphModel dx="1800" dy="1100" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+  <diagram name="Architecture Overview" id="arch-full-v2">
+    <mxGraphModel dx="1800" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1200" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -14,248 +14,257 @@
         </mxCell>
 
         <!-- ═══════════════════════════════════════════════════════ -->
-        <!-- COLUMN 1: UI LAYER (User-facing pages) -->
+        <!-- COLUMN HEADERS -->
         <!-- ═══════════════════════════════════════════════════════ -->
-        <mxCell id="ui-header" value="&lt;b&gt;UI LAYER&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Databricks App&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1E3A5F;strokeColor=#1E3A5F;fontColor=#FFFFFF;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="40" y="70" width="180" height="40" as="geometry" />
+        <mxCell id="hdr-ui" value="&lt;b&gt;UI LAYER&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Databricks App&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1E3A5F;strokeColor=#1E3A5F;fontColor=#FFFFFF;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="180" height="35" as="geometry" />
         </mxCell>
-
-        <mxCell id="ask-page" value="&lt;b&gt;Ask Page&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Natural language Q&amp;A&lt;br&gt;Example chips (certified &amp; analytical)&lt;br&gt;Displays badge + provenance&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="40" y="130" width="180" height="90" as="geometry" />
+        <mxCell id="hdr-svc" value="&lt;b&gt;FLASK SERVICES&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Gunicorn (4 workers)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1E3A5F;strokeColor=#1E3A5F;fontColor=#FFFFFF;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="300" y="70" width="190" height="35" as="geometry" />
         </mxCell>
-
-        <mxCell id="review-page" value="&lt;b&gt;SME Review Page&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Draft queue (pending certification)&lt;br&gt;View/Edit SQL, Run Query&lt;br&gt;Certify or Reject actions&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="40" y="240" width="180" height="90" as="geometry" />
+        <mxCell id="hdr-ms" value="&lt;b&gt;MODEL SERVING&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Confidence Gate&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1E3A5F;strokeColor=#1E3A5F;fontColor=#FFFFFF;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="580" y="70" width="200" height="35" as="geometry" />
         </mxCell>
-
-        <mxCell id="history-page" value="&lt;b&gt;History Page&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;All past queries&lt;br&gt;Lane, badge, latency&lt;br&gt;Filterable by lane/date&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="40" y="350" width="180" height="80" as="geometry" />
+        <mxCell id="hdr-plat" value="&lt;b&gt;PLATFORM SERVICES&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1E3A5F;strokeColor=#1E3A5F;fontColor=#FFFFFF;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="870" y="70" width="410" height="35" as="geometry" />
         </mxCell>
-
-        <mxCell id="admin-page" value="&lt;b&gt;Admin Page&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Corpus stats, system health&lt;br&gt;Config parameters&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="40" y="450" width="180" height="70" as="geometry" />
+        <mxCell id="hdr-data" value="&lt;b&gt;DATA LAYER&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Unity Catalog (Delta)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1E3A5F;strokeColor=#1E3A5F;fontColor=#FFFFFF;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="70" width="190" height="35" as="geometry" />
         </mxCell>
 
         <!-- ═══════════════════════════════════════════════════════ -->
-        <!-- COLUMN 2: FLASK BACKEND SERVICES -->
+        <!-- ROW 1: ASK FLOW (Certified + Analytical routing) -->
+        <!-- Y: 130-280 -->
         <!-- ═══════════════════════════════════════════════════════ -->
-        <mxCell id="svc-header" value="&lt;b&gt;FLASK BACKEND&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Gunicorn (4 workers)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1E3A5F;strokeColor=#1E3A5F;fontColor=#FFFFFF;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="310" y="70" width="200" height="40" as="geometry" />
+
+        <!-- UI: Ask Page -->
+        <mxCell id="ask-page" value="&lt;b&gt;Ask Page&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Natural language Q&amp;A&lt;br&gt;Example chips&lt;br&gt;Displays badge + provenance&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="130" width="180" height="80" as="geometry" />
         </mxCell>
 
-        <mxCell id="router-svc" value="&lt;b&gt;live_router_service&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;POST /api/ask&lt;br&gt;→ Calls Model Serving endpoint&lt;br&gt;→ Dispatches to lane service&lt;br&gt;→ Logs to query_history&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="310" y="130" width="200" height="100" as="geometry" />
+        <!-- Service: live_router_service -->
+        <mxCell id="router-svc" value="&lt;b&gt;live_router_service&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;POST /api/ask&lt;br&gt;Calls serving endpoint&lt;br&gt;Dispatches to lane&lt;br&gt;Logs to query_history&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="125" width="190" height="90" as="geometry" />
         </mxCell>
 
-        <mxCell id="corpus-svc" value="&lt;b&gt;corpus_service&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;GET /api/corpus/drafts&lt;br&gt;POST /api/corpus/certify/{id}&lt;br&gt;POST /api/corpus/reject/{id}&lt;br&gt;POST /api/corpus/run-query&lt;br&gt;&lt;b&gt;+ SQL validation (EXPLAIN)&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="310" y="250" width="200" height="110" as="geometry" />
+        <!-- Model Serving: Router -->
+        <mxCell id="ms-box" value="&lt;b&gt;bannerwise-quality-router&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;MLflow PyFunc | Scale-to-zero&lt;/font&gt;&lt;hr size=&quot;1&quot;&gt;&lt;font style=&quot;font-size:10px&quot;&gt;&lt;b&gt;① Retrieve&lt;/b&gt; → VS (top-3)&lt;br&gt;&lt;b&gt;② Judge&lt;/b&gt; → LLM (MATCH?)&lt;br&gt;&lt;b&gt;③ Gate&lt;/b&gt; → conf ≥ 0.5?&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="580" y="120" width="200" height="130" as="geometry" />
         </mxCell>
 
-        <mxCell id="history-svc" value="&lt;b&gt;history_service&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;GET /api/history&lt;br&gt;log_query() after each ask&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="310" y="380" width="200" height="60" as="geometry" />
+        <!-- Platform: Vector Search -->
+        <mxCell id="vs-box" value="&lt;b&gt;Vector Search&lt;/b&gt;&lt;hr size=&quot;1&quot;&gt;&lt;font style=&quot;font-size:9px&quot;&gt;&lt;b&gt;Endpoint:&lt;/b&gt; bannerwise-vs-endpoint&lt;br&gt;&lt;b&gt;Index:&lt;/b&gt; certified_qa_index&lt;br&gt;&lt;b&gt;Embed:&lt;/b&gt; databricks-bge-large-en&lt;br&gt;&lt;b&gt;Sync:&lt;/b&gt; TRIGGERED (on certify)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="870" y="120" width="195" height="110" as="geometry" />
         </mxCell>
 
-        <mxCell id="genie-svc" value="&lt;b&gt;genie_service&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;start_conversation()&lt;br&gt;poll_result()&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="310" y="460" width="200" height="60" as="geometry" />
+        <!-- Platform: LLM -->
+        <mxCell id="llm-box" value="&lt;b&gt;LLM Endpoint&lt;/b&gt;&lt;hr size=&quot;1&quot;&gt;&lt;font style=&quot;font-size:9px&quot;&gt;&lt;b&gt;Model:&lt;/b&gt; meta-llama-3-3-70b&lt;br&gt;&lt;br&gt;• Binary Judge (router)&lt;br&gt;• Param extraction (certified)&lt;br&gt;• Answer formatting&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1085" y="120" width="195" height="110" as="geometry" />
         </mxCell>
 
-        <!-- UI → Backend arrows -->
-        <mxCell id="ea1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#6C8EBF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="ask-page" target="router-svc" parent="1">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="ea2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#9673A6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="review-page" target="corpus-svc" parent="1">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="ea3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#666;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="history-page" target="history-svc" parent="1">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-
-        <!-- ═══════════════════════════════════════════════════════ -->
-        <!-- COLUMN 3: MODEL SERVING (Confidence Gate) -->
-        <!-- ═══════════════════════════════════════════════════════ -->
-        <mxCell id="ms-header" value="&lt;b&gt;MODEL SERVING&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Confidence Gate (PyFunc)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1E3A5F;strokeColor=#1E3A5F;fontColor=#FFFFFF;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="610" y="70" width="220" height="40" as="geometry" />
-        </mxCell>
-
-        <mxCell id="ms-box" value="&lt;b&gt;bannerwise-quality-router&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;MLflow PyFunc | GPU_SMALL | Scale-to-zero&lt;/font&gt;&lt;hr&gt;&lt;font style=&quot;font-size:10px&quot;&gt;&lt;b&gt;① Retrieve&lt;/b&gt; → Vector Search (top-3)&lt;br&gt;&lt;b&gt;② Judge&lt;/b&gt; → LLM binary (MATCH/NO_MATCH)&lt;br&gt;&lt;b&gt;③ Gate&lt;/b&gt; → conf ≥ 0.5 AND certified?&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;strokeWidth=2;" vertex="1" parent="1">
-          <mxGeometry x="610" y="130" width="220" height="140" as="geometry" />
-        </mxCell>
-
-        <!-- Router Service → Model Serving -->
-        <mxCell id="eb1" value="&lt;font style=&quot;font-size:9px&quot;&gt;w.serving_endpoints.query()&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=2;strokeColor=#D6B656;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="router-svc" target="ms-box" parent="1">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-
-        <!-- Decision outputs from Gate -->
-        <mxCell id="dec-yes" value="&lt;font color=&quot;#82B366&quot;&gt;&lt;b&gt;YES → Certified Lane&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="850" y="140" width="140" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="dec-no" value="&lt;font color=&quot;#B85450&quot;&gt;&lt;b&gt;NO → Analytical Lane&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="850" y="250" width="140" height="20" as="geometry" />
-        </mxCell>
-
-        <!-- ═══════════════════════════════════════════════════════ -->
-        <!-- COLUMN 4: PLATFORM SERVICES -->
-        <!-- ═══════════════════════════════════════════════════════ -->
-        <mxCell id="plat-header" value="&lt;b&gt;DATABRICKS PLATFORM SERVICES&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1E3A5F;strokeColor=#1E3A5F;fontColor=#FFFFFF;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="1020" y="70" width="430" height="40" as="geometry" />
-        </mxCell>
-
-        <!-- Vector Search -->
-        <mxCell id="vs-box" value="&lt;b&gt;Vector Search&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size:9px&quot;&gt;&lt;b&gt;Endpoint:&lt;/b&gt; bannerwise-vs-endpoint&lt;br&gt;&lt;b&gt;Index:&lt;/b&gt; certified_qa_index&lt;br&gt;&lt;b&gt;Embedding:&lt;/b&gt; databricks-bge-large-en&lt;br&gt;&lt;b&gt;Sync:&lt;/b&gt; TRIGGERED (on certify action)&lt;br&gt;&lt;b&gt;Top-k:&lt;/b&gt; 3 candidates&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="1020" y="130" width="200" height="130" as="geometry" />
-        </mxCell>
-
-        <!-- LLM Endpoint -->
-        <mxCell id="llm-box" value="&lt;b&gt;LLM Endpoint&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size:9px&quot;&gt;&lt;b&gt;Model:&lt;/b&gt; databricks-meta-llama&lt;br&gt;-3-3-70b-instruct&lt;br&gt;&lt;br&gt;&lt;b&gt;Used by:&lt;/b&gt;&lt;br&gt;• Binary Judge (router)&lt;br&gt;• Param extraction (certified)&lt;br&gt;• Answer formatting&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="1250" y="130" width="200" height="130" as="geometry" />
-        </mxCell>
-
-        <!-- Genie Space -->
-        <mxCell id="genie-box" value="&lt;b&gt;Genie Space&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size:9px&quot;&gt;&lt;b&gt;ID:&lt;/b&gt; 01f19026...&lt;br&gt;&lt;b&gt;Tables:&lt;/b&gt; 9 analytics tables&lt;br&gt;&lt;b&gt;Examples:&lt;/b&gt; 15 SQL pairs&lt;br&gt;&lt;br&gt;&lt;b&gt;API:&lt;/b&gt; Conversation API&lt;br&gt;(start → poll → extract)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="1020" y="290" width="200" height="140" as="geometry" />
-        </mxCell>
-
-        <!-- SQL Warehouse -->
-        <mxCell id="sql-wh" value="&lt;b&gt;SQL Warehouse&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size:9px&quot;&gt;&lt;b&gt;ID:&lt;/b&gt; 2d8e531640ffa469&lt;br&gt;&lt;br&gt;&lt;b&gt;Used by:&lt;/b&gt;&lt;br&gt;• Certified lane (execute SQL)&lt;br&gt;• Corpus service (CRUD)&lt;br&gt;• History service (logging)&lt;br&gt;• Run Query (review page)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="1250" y="290" width="200" height="140" as="geometry" />
-        </mxCell>
-
-        <!-- ═══════════════════════════════════════════════════════ -->
-        <!-- COLUMN 5: DATA LAYER -->
-        <!-- ═══════════════════════════════════════════════════════ -->
-        <mxCell id="data-header" value="&lt;b&gt;DATA LAYER&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Unity Catalog (Delta)&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1E3A5F;strokeColor=#1E3A5F;fontColor=#FFFFFF;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="1530" y="70" width="200" height="40" as="geometry" />
-        </mxCell>
-
+        <!-- Data: certified_qa_corpus -->
         <mxCell id="corpus-tbl" value="&lt;b&gt;certified_qa_corpus&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;CDF enabled | 20+ entries&lt;br&gt;Source for VS index sync&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="1530" y="130" width="200" height="60" as="geometry" />
+          <mxGeometry x="1370" y="130" width="190" height="60" as="geometry" />
         </mxCell>
 
+        <!-- Data: analytics tables -->
+        <mxCell id="analytics-tbl" value="&lt;b&gt;9 Analytics Tables&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;ad_metrics, campaign_metrics,&lt;br&gt;banner_performance, etc.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="210" width="190" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ROW 1 ARROWS (all horizontal, no overlap) -->
+        <mxCell id="a-ask-router" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=2;strokeColor=#6C8EBF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="ask-page" target="router-svc" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a-router-ms" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=2;strokeColor=#D6B656;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="router-svc" target="ms-box" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a-ms-vs" value="&lt;font style=&quot;font-size:8px&quot;&gt;① query_index()&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#6C8EBF;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.4;entryDx=0;entryDy=0;" edge="1" source="ms-box" target="vs-box" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a-ms-llm" value="&lt;font style=&quot;font-size:8px&quot;&gt;② judge()&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#9673A6;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.4;entryDx=0;entryDy=0;" edge="1" source="ms-box" target="llm-box" parent="1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="850" y="211" /><mxPoint x="850" y="164" /></Array></mxGeometry>
+        </mxCell>
+        <!-- VS → Corpus table (sync arrow) -->
+        <mxCell id="a-vs-corpus" value="&lt;font style=&quot;font-size:8px&quot;&gt;Delta Sync&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#82B366;dashed=1;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="vs-box" target="corpus-tbl" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <!-- ROW 2: GENIE / ANALYTICAL FLOW -->
+        <!-- Y: 310-440 -->
+        <!-- ═══════════════════════════════════════════════════════ -->
+
+        <!-- Platform: Genie Space -->
+        <mxCell id="genie-box" value="&lt;b&gt;Genie Space&lt;/b&gt;&lt;hr size=&quot;1&quot;&gt;&lt;font style=&quot;font-size:9px&quot;&gt;&lt;b&gt;ID:&lt;/b&gt; 01f19026...&lt;br&gt;&lt;b&gt;Tables:&lt;/b&gt; 9 analytics tables&lt;br&gt;&lt;b&gt;Examples:&lt;/b&gt; 15 SQL pairs&lt;br&gt;&lt;br&gt;Conversation API&lt;br&gt;(start → poll → extract)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="870" y="310" width="195" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- Platform: SQL Warehouse -->
+        <mxCell id="sql-wh" value="&lt;b&gt;SQL Warehouse&lt;/b&gt;&lt;hr size=&quot;1&quot;&gt;&lt;font style=&quot;font-size:9px&quot;&gt;&lt;b&gt;ID:&lt;/b&gt; 2d8e531640ffa469&lt;br&gt;&lt;br&gt;• Certified lane (execute SQL)&lt;br&gt;• Corpus service (CRUD)&lt;br&gt;• History service (logging)&lt;br&gt;• Run Query (review page)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1085" y="310" width="195" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- Service: genie_service -->
+        <mxCell id="genie-svc" value="&lt;b&gt;genie_service&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;w.api_client.do()&lt;br&gt;start_conversation / poll&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="320" width="190" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Service: certified_lane_service -->
+        <mxCell id="cert-svc" value="&lt;b&gt;certified_lane_service&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Extract params → Bind SQL&lt;br&gt;→ Execute → Format answer&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="580" y="320" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ROW 2 ARROWS -->
+        <!-- Router → Genie Service (analytical path, goes down then right) -->
+        <mxCell id="a-router-genie-svc" value="&lt;font style=&quot;font-size:8px&quot; color=&quot;#B85450&quot;&gt;NO (analytical)&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#B85450;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="router-svc" target="genie-svc" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Router → Certified Service (certified path, goes down-right) -->
+        <mxCell id="a-router-cert-svc" value="&lt;font style=&quot;font-size:8px&quot; color=&quot;#82B366&quot;&gt;YES (certified)&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;strokeColor=#82B366;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="router-svc" target="cert-svc" parent="1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="530" y="290" /><mxPoint x="680" y="290" /></Array></mxGeometry>
+        </mxCell>
+        <!-- Genie Service → Genie Space -->
+        <mxCell id="a-gsvc-genie" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#B85450;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.4;entryDx=0;entryDy=0;" edge="1" source="genie-svc" target="genie-box" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Certified Service → SQL Warehouse -->
+        <mxCell id="a-cert-sqlwh" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#82B366;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.4;entryDx=0;entryDy=0;" edge="1" source="cert-svc" target="sql-wh" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Certified Service → LLM (for param extraction) -->
+        <mxCell id="a-cert-llm" value="&lt;font style=&quot;font-size:8px&quot;&gt;extract params&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1;strokeColor=#9673A6;dashed=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" source="cert-svc" target="llm-box" parent="1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="680" y="290" /><mxPoint x="1183" y="290" /></Array></mxGeometry>
+        </mxCell>
+        <!-- SQL Warehouse → Analytics tables -->
+        <mxCell id="a-sqlwh-analytics" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#82B366;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sql-wh" target="analytics-tbl" parent="1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1340" y="375" /><mxPoint x="1340" y="240" /></Array></mxGeometry>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <!-- ROW 3: CERTIFICATION / REVIEW FLOW -->
+        <!-- Y: 480-600 -->
+        <!-- ═══════════════════════════════════════════════════════ -->
+
+        <!-- UI: SME Review Page -->
+        <mxCell id="review-page" value="&lt;b&gt;SME Review Page&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Draft queue&lt;br&gt;View/Edit SQL, Run Query&lt;br&gt;Certify or Reject&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="500" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Service: corpus_service -->
+        <mxCell id="corpus-svc" value="&lt;b&gt;corpus_service&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;GET /api/corpus/drafts&lt;br&gt;POST /certify/{id}&lt;br&gt;POST /reject/{id}&lt;br&gt;POST /run-query&lt;br&gt;&lt;b&gt;+ SQL validation (EXPLAIN)&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="490" width="190" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- Certify action box -->
+        <mxCell id="certify-action" value="&lt;b&gt;Certify Action&lt;/b&gt;&lt;hr size=&quot;1&quot;&gt;&lt;font style=&quot;font-size:9px&quot;&gt;1. EXPLAIN (validate SQL)&lt;br&gt;2. INSERT into corpus&lt;br&gt;3. DELETE from draft&lt;br&gt;4. sync_index() → VS&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="580" y="490" width="200" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- Data: draft table -->
         <mxCell id="draft-tbl" value="&lt;b&gt;certified_qa_corpus_draft&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Staging for review queue&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="1530" y="210" width="200" height="50" as="geometry" />
+          <mxGeometry x="1370" y="490" width="190" height="50" as="geometry" />
         </mxCell>
 
+        <!-- Data: query_history -->
         <mxCell id="history-tbl" value="&lt;b&gt;query_history&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Audit trail for all queries&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="1530" y="280" width="200" height="50" as="geometry" />
+          <mxGeometry x="1370" y="560" width="190" height="50" as="geometry" />
         </mxCell>
 
-        <mxCell id="analytics-tbl" value="&lt;b&gt;9 Analytics Tables&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;ad_metrics, campaign_metrics,&lt;br&gt;banner_performance, regional_metrics,&lt;br&gt;network_metrics, channel_metrics...&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
-          <mxGeometry x="1530" y="350" width="200" height="80" as="geometry" />
-        </mxCell>
-
-        <!-- ═══════════════════════════════════════════════════════ -->
-        <!-- ARROWS: Model Serving → Platform Services -->
-        <!-- ═══════════════════════════════════════════════════════ -->
-        <mxCell id="ec1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#6C8EBF;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="ms-box" target="vs-box" parent="1">
+        <!-- ROW 3 ARROWS -->
+        <mxCell id="a-review-corpus" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=2;strokeColor=#9673A6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="review-page" target="corpus-svc" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="ec1l" value="&lt;font style=&quot;font-size:8px&quot;&gt;① query_index()&lt;/font&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="ec1">
-          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
-        </mxCell>
-
-        <mxCell id="ec2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#9673A6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="ms-box" target="llm-box" parent="1">
-          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="990" y="200" /><mxPoint x="990" y="195" /></Array></mxGeometry>
-        </mxCell>
-        <mxCell id="ec2l" value="&lt;font style=&quot;font-size:8px&quot;&gt;② judge()&lt;/font&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="ec2">
-          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
-        </mxCell>
-
-        <!-- Router Service → Genie (analytical path) -->
-        <mxCell id="ec3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#B85450;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;dashed=1;" edge="1" source="router-svc" target="genie-box" parent="1">
-          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="560" y="210" /><mxPoint x="560" y="360" /></Array></mxGeometry>
-        </mxCell>
-        <mxCell id="ec3l" value="&lt;font style=&quot;font-size:8px&quot; color=&quot;#B85450&quot;&gt;Analytical path&lt;/font&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="ec3">
-          <mxGeometry x="-0.3" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
-        </mxCell>
-
-        <!-- Corpus Service → SQL Warehouse -->
-        <mxCell id="ec4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#82B366;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="corpus-svc" target="sql-wh" parent="1">
-          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="580" y="305" /><mxPoint x="580" y="360" /></Array></mxGeometry>
-        </mxCell>
-
-        <!-- SQL Warehouse → Data tables -->
-        <mxCell id="ec5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#82B366;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sql-wh" target="corpus-tbl" parent="1">
+        <mxCell id="a-corpus-certify" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=2;strokeColor=#82B366;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="corpus-svc" target="certify-action" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="ec6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#82B366;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sql-wh" target="analytics-tbl" parent="1">
+        <mxCell id="a-certify-sqlwh" value="&lt;font style=&quot;font-size:8px&quot;&gt;EXPLAIN + INSERT&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#82B366;exitX=1;exitY=0.4;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" edge="1" source="certify-action" target="sql-wh" parent="1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="840" y="530" /><mxPoint x="840" y="401" /></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="a-certify-vs" value="&lt;font style=&quot;font-size:8px&quot;&gt;sync_index()&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#6C8EBF;dashed=1;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0.3;entryY=1;entryDx=0;entryDy=0;" edge="1" source="certify-action" target="vs-box" parent="1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="810" y="510" /><mxPoint x="810" y="470" /><mxPoint x="929" y="470" /></Array></mxGeometry>
+        </mxCell>
+        <!-- Corpus service → Draft table -->
+        <mxCell id="a-corpus-draft" value="&lt;font style=&quot;font-size:8px&quot;&gt;READ/DELETE&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#D6B656;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="corpus-svc" target="draft-tbl" parent="1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="530" y="570" /><mxPoint x="530" y="610" /><mxPoint x="1340" y="610" /><mxPoint x="1340" y="515" /></Array></mxGeometry>
+        </mxCell>
+
+        <!-- ═══════════════════════════════════════════════════════ -->
+        <!-- ROW 4: HISTORY / ADMIN -->
+        <!-- Y: 640-720 -->
+        <!-- ═══════════════════════════════════════════════════════ -->
+
+        <!-- UI: History Page -->
+        <mxCell id="history-page" value="&lt;b&gt;History Page&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;All past queries&lt;br&gt;Lane, badge, latency&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="650" width="180" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Service: history_service -->
+        <mxCell id="history-svc" value="&lt;b&gt;history_service&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;GET /api/history&lt;br&gt;log_query() after each ask&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=10;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="650" width="190" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ROW 4 ARROWS -->
+        <mxCell id="a-hist-svc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#666;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="history-page" target="history-svc" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- VS Index ←→ Corpus table (sync) -->
-        <mxCell id="ec7" value="&lt;font style=&quot;font-size:8px&quot;&gt;Delta Sync&lt;br&gt;(TRIGGERED)&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#6C8EBF;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" source="vs-box" target="corpus-tbl" parent="1">
-          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1490" y="195" /><mxPoint x="1490" y="148" /></Array></mxGeometry>
+        <mxCell id="a-histsvc-tbl" value="&lt;font style=&quot;font-size:8px&quot;&gt;SELECT/INSERT&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=1.5;strokeColor=#666;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="history-svc" target="history-tbl" parent="1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="530" y="680" /><mxPoint x="530" y="680" /><mxPoint x="1340" y="680" /><mxPoint x="1340" y="585" /></Array></mxGeometry>
         </mxCell>
 
         <!-- ═══════════════════════════════════════════════════════ -->
-        <!-- USE CASE FLOW ANNOTATIONS (bottom) -->
+        <!-- USE CASE SUMMARY (bottom panel) -->
         <!-- ═══════════════════════════════════════════════════════ -->
-        <mxCell id="uc-header" value="&lt;b&gt;USE CASE FLOWS&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1E3A5F;strokeColor=#1E3A5F;fontColor=#FFFFFF;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
-          <mxGeometry x="40" y="570" width="1410" height="30" as="geometry" />
+        <mxCell id="uc-header" value="&lt;b&gt;USE CASE FLOWS (end-to-end paths)&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1E3A5F;strokeColor=#1E3A5F;fontColor=#FFFFFF;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="760" width="1520" height="25" as="geometry" />
         </mxCell>
 
-        <!-- UC1: Certified Question -->
-        <mxCell id="uc1" value="&lt;b&gt;UC1: Certified Question&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Ask Page → live_router_service → Model Serving (VS + Judge = YES) → Extract params (LLM) → SQL Warehouse (execute) → &lt;font color=&quot;#82B366&quot;&gt;&lt;b&gt;Badge: Certified&lt;/b&gt;&lt;/font&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=10;verticalAlign=middle;arcSize=8;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="40" y="620" width="690" height="50" as="geometry" />
+        <mxCell id="uc1" value="&lt;b&gt;UC1 — Certified Question:&lt;/b&gt;  Ask Page → live_router_service → Model Serving (VS ① + Judge ② = MATCH ③) → certified_lane_service → LLM (extract params) → SQL Warehouse → &lt;font color=&quot;#82B366&quot;&gt;&lt;b&gt;Badge: Certified ✓&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=10;verticalAlign=middle;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="800" width="750" height="35" as="geometry" />
         </mxCell>
 
-        <!-- UC2: Analytical Question -->
-        <mxCell id="uc2" value="&lt;b&gt;UC2: Analytical Question&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Ask Page → live_router_service → Model Serving (VS + Judge = NO) → genie_service → Genie Space (dynamic SQL) → &lt;font color=&quot;#B85450&quot;&gt;&lt;b&gt;Badge: Not Certified&lt;/b&gt;&lt;/font&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=10;verticalAlign=middle;arcSize=8;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="40" y="690" width="690" height="50" as="geometry" />
+        <mxCell id="uc2" value="&lt;b&gt;UC2 — Analytical Question:&lt;/b&gt;  Ask Page → live_router_service → Model Serving (VS ① + Judge ② = NO_MATCH ③) → genie_service → Genie Space (dynamic SQL) → &lt;font color=&quot;#B85450&quot;&gt;&lt;b&gt;Badge: Not Certified&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=10;verticalAlign=middle;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="845" width="750" height="35" as="geometry" />
         </mxCell>
 
-        <!-- UC3: Certification Flow -->
-        <mxCell id="uc3" value="&lt;b&gt;UC3: Certification Flywheel&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;User clicks &quot;Add to Review&quot; → corpus_service (submit_draft) → SME Review Page (edit SQL, run query) → Certify → SQL Validation → INSERT certified_qa_corpus → &lt;b&gt;sync_index()&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=10;verticalAlign=middle;arcSize=8;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="40" y="760" width="690" height="50" as="geometry" />
+        <mxCell id="uc3" value="&lt;b&gt;UC3 — Certification Flywheel:&lt;/b&gt;  User &quot;Add to Review&quot; → submit_draft → SME Review → Edit SQL → Run Query → Certify (EXPLAIN validates) → INSERT corpus → sync_index() → &lt;b&gt;Next match routes certified&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=10;verticalAlign=middle;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="890" width="750" height="35" as="geometry" />
         </mxCell>
 
-        <!-- UC4: Direct Query Testing -->
-        <mxCell id="uc4" value="&lt;b&gt;UC4: SQL Query Preview&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;SME Review Page → corpus_service (/run-query) → SQL Warehouse (with LIMIT 50) → results displayed in review panel&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=10;verticalAlign=middle;arcSize=8;shadow=0;" vertex="1" parent="1">
-          <mxGeometry x="40" y="830" width="690" height="50" as="geometry" />
+        <mxCell id="uc4" value="&lt;b&gt;UC4 — Query Preview:&lt;/b&gt;  SME Review Page → /api/corpus/run-query → SQL Warehouse (WITH...SELECT + LIMIT 50) → results displayed in review panel" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=10;verticalAlign=middle;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="935" width="750" height="35" as="geometry" />
         </mxCell>
 
         <!-- ═══════════════════════════════════════════════════════ -->
-        <!-- LEGEND -->
+        <!-- LEGEND (bottom right) -->
         <!-- ═══════════════════════════════════════════════════════ -->
-        <mxCell id="leg-header" value="&lt;b&gt;LEGEND&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;fontColor=#1E3A5F;" vertex="1" parent="1">
-          <mxGeometry x="810" y="600" width="70" height="20" as="geometry" />
+        <mxCell id="leg-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFAFA;strokeColor=#CCCCCC;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="870" y="800" width="320" height="170" as="geometry" />
         </mxCell>
-        <mxCell id="leg1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="810" y="630" width="20" height="15" as="geometry" />
+        <mxCell id="leg-title" value="&lt;b&gt;LEGEND&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;fontColor=#1E3A5F;" vertex="1" parent="1">
+          <mxGeometry x="885" y="805" width="70" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="leg1t" value="Certified / Pass" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="835" y="628" width="90" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="leg2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="810" y="655" width="20" height="15" as="geometry" />
-        </mxCell>
-        <mxCell id="leg2t" value="Analytical / Genie" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="835" y="653" width="100" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="leg3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="810" y="680" width="20" height="15" as="geometry" />
-        </mxCell>
-        <mxCell id="leg3t" value="Gate / Decision" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="835" y="678" width="90" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="leg4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="960" y="630" width="20" height="15" as="geometry" />
-        </mxCell>
-        <mxCell id="leg4t" value="Processing / Compute" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="985" y="628" width="110" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="leg5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="960" y="655" width="20" height="15" as="geometry" />
-        </mxCell>
-        <mxCell id="leg5t" value="LLM / Review" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="985" y="653" width="80" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="leg6" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1E3A5F;strokeColor=#1E3A5F;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="960" y="680" width="20" height="15" as="geometry" />
-        </mxCell>
-        <mxCell id="leg6t" value="Section Header" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="985" y="678" width="80" height="20" as="geometry" />
-        </mxCell>
+
+        <mxCell id="l1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;" vertex="1" parent="1"><mxGeometry x="890" y="835" width="18" height="14" as="geometry" /></mxCell>
+        <mxCell id="l1t" value="Certified / Pass / SQL Warehouse" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1"><mxGeometry x="915" y="833" width="170" height="18" as="geometry" /></mxCell>
+
+        <mxCell id="l2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;" vertex="1" parent="1"><mxGeometry x="890" y="858" width="18" height="14" as="geometry" /></mxCell>
+        <mxCell id="l2t" value="Analytical / Genie Space" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1"><mxGeometry x="915" y="856" width="130" height="18" as="geometry" /></mxCell>
+
+        <mxCell id="l3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;" vertex="1" parent="1"><mxGeometry x="890" y="881" width="18" height="14" as="geometry" /></mxCell>
+        <mxCell id="l3t" value="Decision Gate / Router" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1"><mxGeometry x="915" y="879" width="120" height="18" as="geometry" /></mxCell>
+
+        <mxCell id="l4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;" vertex="1" parent="1"><mxGeometry x="890" y="904" width="18" height="14" as="geometry" /></mxCell>
+        <mxCell id="l4t" value="Processing / Vector Search" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1"><mxGeometry x="915" y="902" width="140" height="18" as="geometry" /></mxCell>
+
+        <mxCell id="l5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;" vertex="1" parent="1"><mxGeometry x="890" y="927" width="18" height="14" as="geometry" /></mxCell>
+        <mxCell id="l5t" value="LLM / Review / Certification" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1"><mxGeometry x="915" y="925" width="150" height="18" as="geometry" /></mxCell>
+
+        <mxCell id="l6" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="890" y="950" width="18" height="14" as="geometry" /></mxCell>
+        <mxCell id="l6t" value="History / Admin (read-only)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1"><mxGeometry x="915" y="948" width="140" height="18" as="geometry" /></mxCell>
+
+        <mxCell id="l7a" value="——→" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="886" y="970" width="30" height="18" as="geometry" /></mxCell>
+        <mxCell id="l7t" value="Data flow (solid = primary, dashed = async)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1"><mxGeometry x="915" y="970" width="220" height="18" as="geometry" /></mxCell>
 
       </root>
     </mxGraphModel>
