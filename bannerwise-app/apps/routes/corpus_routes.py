@@ -17,7 +17,7 @@ from services.corpus_service import (
     certify_entry,
     reject_entry,
 )
-from services.genie_service import _correct_sql
+from services.genie_service import correct_sql
 from databricks.sdk import WorkspaceClient
 
 logger = logging.getLogger(__name__)

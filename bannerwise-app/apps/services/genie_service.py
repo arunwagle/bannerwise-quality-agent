@@ -114,6 +114,11 @@ def _extract_result(msg_resp: dict) -> dict:
         if attachment.get("text") and attachment["text"].get("content"):
             answer = attachment["text"]["content"]
 
+    # --- LLM SQL Correction ---
+    # Validate and fix common issues before returning
+    if sql_executed:
+        sql_executed = correct_sql(sql_executed)
+
     # If no text answer but we have SQL, indicate SQL was executed
     if not answer and sql_executed:
         answer = f"Query executed successfully. SQL: {sql_executed[:200]}"
