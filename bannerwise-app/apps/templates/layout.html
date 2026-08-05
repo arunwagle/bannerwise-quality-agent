@@ -50,12 +50,6 @@
                         <span class="nav-label">History</span>
                     </a>
                 </li>
-                <li class="nav-item {% if request.path == '/demo' %}active{% endif %}">
-                    <a href="/demo" class="nav-link">
-                        <span class="nav-icon">&#x1F3AF;</span>
-                        <span class="nav-label">Demo</span>
-                    </a>
-                </li>
                 <li class="nav-item {% if request.path == '/corpus' %}active{% endif %}">
                     <a href="/corpus" class="nav-link">
                         <span class="nav-icon">&#x1F4CB;</span>
@@ -66,6 +60,12 @@
                     <a href="/admin" class="nav-link">
                         <span class="nav-icon">&#x2699;</span>
                         <span class="nav-label">Admin</span>
+                    </a>
+                </li>
+                <li class="nav-item {% if request.path == '/demo' %}active{% endif %}">
+                    <a href="/demo" class="nav-link">
+                        <span class="nav-icon">&#x1F3AF;</span>
+                        <span class="nav-label">Demo</span>
                     </a>
                 </li>
             </ul>
