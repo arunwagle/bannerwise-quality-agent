@@ -55,7 +55,7 @@ The user's prompt is embedded using `databricks-bge-large-en` and compared again
 | --- | --- |
 | Embedding Model | `databricks-bge-large-en` |
 | Index | `aw_serverless_stable_catalog.bannerhealth.certified_qa_index` |
-| Sync Mode | Delta Sync (auto-syncs when `certified_qa_corpus` changes) |
+| Sync Mode | Delta Sync (TRIGGERED — manually synced on certify action) |
 | Top-K | 3 candidates |
 | Similarity | Cosine |
 | Fields Returned | `corpus_id`, `question`, `score`, `status`, `parameterized_sql`, `answer_template`, `parameters` |
@@ -232,7 +232,7 @@ SME opens Review page → sees question + SQL + answer
        ├── "Run Modified Query" → test/edit SQL in textarea, preview results
        │
        ├── "Certify" → moves to certified_qa_corpus (new QA-XXXX id)
-       │                 → VS index auto-syncs via Delta Sync (CDF)
+       │                 → Triggers VS index sync via SDK (sync_index API)
        │                 → Next similar question routes to Certified Lane ✅
        │
        └── "Reject" → removed from draft table
@@ -318,7 +318,7 @@ The jobs must be run in sequence for a fresh deployment:
 **Index configuration:**
 - Source: `certified_qa_corpus` (requires CDF enabled)
 - Column: `question` → embedded via `databricks-bge-large-en`
-- Sync mode: TRIGGERED initially, then CONTINUOUS
+- Sync mode: TRIGGERED (manually triggered on each certify action via `sync_index` API)
 - Columns synced: `id`, `question`, `parameterized_sql`, `answer_template`, `parameters`, `status`, `certified_by`, `certified_date`, `next_review_date`
 
 **Prerequisites:**

@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 CATALOG = os.environ.get("CATALOG_NAME", "aw_serverless_stable_catalog")
 SCHEMA = os.environ.get("SCHEMA_NAME", "bannerhealth")
 SQL_WAREHOUSE_ID = os.environ.get("SQL_WAREHOUSE_ID", "2d8e531640ffa469")
+VS_INDEX_NAME = f"{CATALOG}.{SCHEMA}.certified_qa_index"
 
 DRAFT_TABLE = f"{CATALOG}.{SCHEMA}.certified_qa_corpus_draft"
 CERTIFIED_TABLE = f"{CATALOG}.{SCHEMA}.certified_qa_corpus"
