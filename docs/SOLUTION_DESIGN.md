@@ -2,38 +2,8 @@
 
 ## 1. Architecture Overview
 
-```
-┌────────────────────────────────────────────────────────────────────┐
-│                    BannerWise Databricks App                        │
-│                  (Flask + Gunicorn on DB Apps)                      │
-└────────────────────────────────────┬───────────────────────────────┘
-                                     │ User Prompt
-                                     ▼
-┌────────────────────────────────────────────────────────────────────┐
-│              CONFIDENCE GATE (Model Serving Endpoint)               │
-│                                                                    │
-│   embed → Vector Search retrieve (top-k) → LLM Judge →            │
-│   confidence score (0.0 or 1.0 based on judge verdict)             │
-└────────────────────────────────────┬───────────────────────────────┘
-                                     │
-                            confidence >= 0.5
-                            AND status = certified?
-                                     │
-                      ┌──── YES ─────┴───── NO ────┐
-                      ▼                            ▼
-┌──────────────────────────┐    ┌──────────────────────────┐
-│ CERTIFIED LANE            │    │ ANALYTICAL LANE            │
-│ (green badge)             │    │ (amber badge)              │
-│                           │    │                            │
-│ • Lookup SQL template     │    │ • Route to Genie Space     │
-│ • Extract params via LLM  │    │   Conversation API         │
-│ • Execute certified SQL   │    │ • Dynamic SQL generation   │
-│ • Format answer via LLM   │    │ • Returns table/text       │
-│                           │    │                            │
-│ → Badge: "Certified"      │    │ → Badge: "Not Certified"   │
-│ + provenance              │    │ + "Add to SME Review"      │
-└──────────────────────────┘    └──────────────────────────┘
-```
+<!-- Diagram: docs/diagrams/01_architecture_overview.drawio -->
+![Architecture Overview](diagrams/01_architecture_overview.png)
 
 ---
 
@@ -148,31 +118,8 @@ The binary approach is simple, predictable, and easy to explain. The quality con
 
 When the gate says YES, the certified lane executes the pre-approved SQL with extracted parameters.
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    CERTIFIED LANE                              │
-│                                                              │
-│  1. Lookup corpus entry by corpus_id                          │
-│     → parameterized_sql, answer_template, parameters         │
-│                                                              │
-│  2. Extract parameters from user prompt via LLM               │
-│     Prompt: "Extract {period} from: 'total ad spend Q1 2025'"│
-│     → {"period": "Q1 2025"}                                  │
-│                                                              │
-│  3. Bind parameters into SQL template                         │
-│     "SELECT SUM(spend) FROM ad_metrics WHERE period = :period"│
-│     → "SELECT SUM(spend) ... WHERE period = 'Q1 2025'"       │
-│                                                              │
-│  4. Execute SQL via SQL Warehouse (statement_execution API)   │
-│     → {"total_spend": 254500.75}                             │
-│                                                              │
-│  5. Format answer using LLM + answer_template                 │
-│     Template: "Total ad spend for {period} was ${total_spend}"│
-│     → "The total ad spend for Q1 2025 was $254,500.75."      │
-│                                                              │
-│  6. Return with badge: "Certified" + full provenance         │
-└──────────────────────────────────────────────────────────────┘
-```
+<!-- Diagram: docs/diagrams/02_certified_lane_flow.drawio -->
+![Certified Lane Flow](diagrams/02_certified_lane_flow.png)
 
 **LLM Endpoint**: `databricks-meta-llama-3-3-70b-instruct` (for parameter extraction and answer formatting)
 
@@ -182,27 +129,8 @@ When the gate says YES, the certified lane executes the pre-approved SQL with ex
 
 When the gate says NO, the analytical lane forwards to the Genie Space for dynamic SQL generation.
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    ANALYTICAL LANE (Genie Space)               │
-│                                                              │
-│  1. POST /api/2.0/genie/spaces/{id}/start-conversation       │
-│     Body: {"content": "<user_prompt>"}                        │
-│                                                              │
-│  2. Poll GET .../messages/{id} until COMPLETED or timeout     │
-│     (polling interval: 2s, max wait: 60s)                    │
-│                                                              │
-│  3. Extract from response attachments:                        │
-│     - Generated SQL from attachment.query.query               │
-│     - Answer text from attachment.text.content                │
-│                                                              │
-│  4. Return with badge: "Not Certified"                        │
-│     Provenance: {source: "genie_space", genie_status,        │
-│                  sql_executed, genie_error}                   │
-│                                                              │
-│  5. User can click "Add to SME Review" → enters flywheel     │
-└──────────────────────────────────────────────────────────────┘
-```
+<!-- Diagram: docs/diagrams/03_analytical_lane_flow.drawio -->
+![Analytical Lane Flow](diagrams/03_analytical_lane_flow.png)
 
 **Genie Space Configuration:**
 - 9 analytics tables registered
@@ -216,27 +144,8 @@ When the gate says NO, the analytical lane forwards to the Genie Space for dynam
 
 The certification flywheel is the mechanism by which the system self-improves over time. Each uncertified answer is an opportunity to expand the certified corpus.
 
-```
-User asks question → Analytical Lane (Not Certified)
-       │
-       ▼
-Clicks "Add to SME Review"
-       │
-       ▼
-Draft saved to certified_qa_corpus_draft table
-(id: DRAFT-{8hex}, question, sql, answer, submitted_by, original_prompt)
-       │
-       ▼
-SME opens Review page → sees question + SQL + answer
-       │
-       ├── "Run Modified Query" → test/edit SQL in textarea, preview results
-       │
-       ├── "Certify" → moves to certified_qa_corpus (new QA-XXXX id)
-       │                 → Triggers VS index sync via SDK (sync_index API)
-       │                 → Next similar question routes to Certified Lane ✅
-       │
-       └── "Reject" → removed from draft table
-```
+<!-- Diagram: docs/diagrams/04_certification_flywheel.drawio -->
+![Certification Flywheel](diagrams/04_certification_flywheel.png)
 
 **Key design decisions:**
 - CDF must remain enabled on `certified_qa_corpus` for Delta Sync to work
@@ -253,24 +162,8 @@ SME opens Review page → sees question + SQL + answer
 
 The jobs must be run in sequence for a fresh deployment:
 
-```
-1. bundle deploy --target dev
-       │
-       ▼
-2. setup_job (creates schema + tables + synthetic data)
-       │
-       ▼
-3. setup_access_job (grants permissions to app SP)
-       │
-       ▼
-4. vector_index_job (builds VS index from certified corpus)
-       │
-       ▼
-5. router_agent_job (trains, evaluates, registers, deploys model)
-       │
-       ▼
-6. App deploy (manual — Databricks Apps deployment)
-```
+<!-- Diagram: docs/diagrams/05_deployment_order.drawio -->
+![Deployment Order](diagrams/05_deployment_order.png)
 
 ---
 
@@ -467,14 +360,8 @@ class RouterAgent(mlflow.pyfunc.PythonModel):
 
 ### Model Registration Flow
 
-```
-MLflow Experiment → Log Model → Register to UC → Set Alias "champion"
-     │                                                    │
-     └── Metrics: precision, recall, F1, latency          │
-                                                          ▼
-                                              Model Serving Endpoint
-                                              (GPU_SMALL, scale_to_zero)
-```
+<!-- Diagram: docs/diagrams/06_model_registration_flow.drawio -->
+![Model Registration Flow](diagrams/06_model_registration_flow.png)
 
 ### Model Versioning Strategy
 

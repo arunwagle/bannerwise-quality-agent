@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2025-01-01T00:00:00.000Z" agent="Genie" version="24.0.0">
+  <diagram name="Analytical Lane Flow" id="anal-01">
+    <mxGraphModel dx="1422" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="450" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t1" value="Analytical Lane — Execution Flow (Genie Space)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=18;fontStyle=1;fontColor=#1E3A5F;" vertex="1" parent="1">
+          <mxGeometry x="430" y="15" width="440" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" value="&lt;b&gt;① Start&lt;br&gt;Conversation&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size:10px&quot;&gt;POST /genie/spaces/&lt;br&gt;{id}/start-conversation&lt;br&gt;&lt;br&gt;&lt;i&gt;Body: {content: prompt}&lt;/i&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=11;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="190" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="&lt;b&gt;② Poll for&lt;br&gt;Completion&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size:10px&quot;&gt;GET .../messages/{id}&lt;br&gt;every 2s until COMPLETED&lt;br&gt;&lt;br&gt;&lt;i&gt;Timeout: 60s&lt;/i&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=11;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="80" width="180" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="&lt;b&gt;③ Extract&lt;br&gt;Results&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size:10px&quot;&gt;From attachments:&lt;br&gt;• SQL → query.query&lt;br&gt;• Answer → text.content&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=11;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="550" y="80" width="180" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="s4" value="&lt;b&gt;④ Return&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Badge: &lt;font color=&quot;#B85450&quot;&gt;&lt;b&gt;Not Certified&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;br&gt;Provenance:&lt;br&gt;{genie_space_id,&lt;br&gt;sql_executed,&lt;br&gt;conversation_id}&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=11;verticalAlign=middle;arcSize=8;shadow=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="800" y="80" width="180" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="s5" value="&lt;b&gt;⑤ User Action&lt;/b&gt;&lt;hr&gt;&lt;font style=&quot;font-size:10px&quot;&gt;&lt;font color=&quot;#82B366&quot;&gt;✚ &quot;Add to SME Review&quot;&lt;/font&gt;&lt;br&gt;&lt;br&gt;→ Draft saved to&lt;br&gt;certified_qa_corpus_draft&lt;br&gt;→ Enters flywheel&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=11;verticalAlign=middle;arcSize=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="80" width="190" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="a12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=2;strokeColor=#333;" edge="1" source="s1" target="s2" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=2;strokeColor=#333;" edge="1" source="s2" target="s3" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=2;strokeColor=#333;" edge="1" source="s3" target="s4" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="a45" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeWidth=2;strokeColor=#333;" edge="1" source="s4" target="s5" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="note" value="&lt;i&gt;Genie Space: 9 analytics tables, 15 example SQL pairs&lt;/i&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="440" y="240" width="310" height="20" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
