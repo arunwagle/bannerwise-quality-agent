@@ -50,18 +50,36 @@ def assess_prompt(prompt: str) -> dict:
         else:
             prediction = {}
 
-        # Extract fields
+        # Extract fields — corpus_id and other routing details are nested
+        # inside "provenance" in the RouterResult.to_dict() output
         if isinstance(prediction, dict):
             lane = prediction.get("lane", "analytical")
             confidence = prediction.get("confidence", 0.0)
-            corpus_id = prediction.get("corpus_id")
-            matched_question = prediction.get("matched_question")
-            vs_score = prediction.get("vs_score", 0.0)
-            judge_verdict = prediction.get("judge_verdict", "UNKNOWN")
-            reason = prediction.get("reason", "")
-            threshold_used = prediction.get("threshold_used", 0.5)
-            candidates_evaluated = prediction.get("candidates_evaluated", 0)
-            error = prediction.get("error")
+            provenance = prediction.get("provenance", {})
+
+            # Certified lane: provenance.corpus_id
+            # Analytical lane: provenance.best_candidate.corpus_id
+            best_candidate = provenance.get("best_candidate", {})
+            corpus_id = (
+                provenance.get("corpus_id")
+                or best_candidate.get("corpus_id")
+                or prediction.get("corpus_id")
+            )
+            matched_question = (
+                provenance.get("certified_question")
+                or best_candidate.get("question")
+                or prediction.get("matched_question")
+            )
+            vs_score = (
+                best_candidate.get("vs_score")
+                or provenance.get("vs_score")
+                or prediction.get("vs_score", 0.0)
+            )
+            judge_verdict = provenance.get("judge_verdict", prediction.get("judge_verdict", "UNKNOWN"))
+            reason = provenance.get("reason", prediction.get("reason", ""))
+            threshold_used = provenance.get("threshold_used", prediction.get("threshold_used", 0.5))
+            candidates_evaluated = provenance.get("candidates_evaluated", prediction.get("candidates_evaluated", 0))
+            error = prediction.get("error") or provenance.get("error")
         else:
             lane = "analytical"
             confidence = 0.0

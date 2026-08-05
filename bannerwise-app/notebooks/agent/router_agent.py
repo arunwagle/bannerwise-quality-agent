@@ -1,16 +1,16 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Bannerwise Quality Router — Supervisor Agent
-# MAGIC 
+# MAGIC
 # MAGIC Implements the **BannerwiseQualityRouter** as an MLflow Pyfunc model following
 # MAGIC the [Multi-Agent Supervisor](https://docs.databricks.com/aws/en/agents/agent-bricks/multi-agent-supervisor) pattern.
-# MAGIC 
+# MAGIC
 # MAGIC **Decision Flow**: Retrieve → Short-circuit → Rerank/Calibrate → Staleness → Gate → Lane
-# MAGIC 
+# MAGIC
 # MAGIC **Tools**:
 # MAGIC 1. Vector Search (always first) — deterministic retrieval from `certified_qa_index`
 # MAGIC 2. Genie Space (fallback) — LLM-powered analytical answers via Conversation API
-# MAGIC 
+# MAGIC
 # MAGIC **Deployment**: Registered to UC, served via endpoint defined in `resources/bannerwise_quality_agent.ai.yml`
 
 # COMMAND ----------
@@ -218,6 +218,7 @@ def short_circuit_check(candidates: List[Candidate]) -> Optional[RouterResult]:
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 3 — Rerank / Calibrate (LLM Judge)
 import json
 from openai import OpenAI
 
@@ -257,10 +258,9 @@ Certified template: "{candidate.question}"
 
 Answer with ONLY one word: MATCH or NO_MATCH"""
 
-    # Inline LLM call (no _call_llm helper in this notebook)
-    token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
-    host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().get()
-    client = OpenAI(api_key=token, base_url=f"{host}/serving-endpoints")
+    # Use WorkspaceClient for auth (works in both notebooks AND Model Serving)
+    w = WorkspaceClient()
+    client = OpenAI(api_key=w.config.token, base_url=f"{w.config.host}/serving-endpoints")
     try:
         response = client.chat.completions.create(
             model=JUDGE_MODEL,
@@ -347,6 +347,7 @@ def gate_decision(
 
 # COMMAND ----------
 
+# DBTITLE 1,Certified Lane (State 1)
 from jinja2 import Template as JinjaTemplate
 
 
@@ -405,9 +406,9 @@ Return ONLY a JSON object mapping parameter names to their extracted values.
 If a parameter value is not found in the question, use a reasonable default.
 Example: {{"period": "Q1 2025", "campaign": "spring_sale"}}"""
 
-    token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
-    host = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiUrl().get()
-    client = OpenAI(api_key=token, base_url=f"{host}/serving-endpoints")
+    # Use WorkspaceClient for auth (works in both notebooks AND Model Serving)
+    w = WorkspaceClient()
+    client = OpenAI(api_key=w.config.token, base_url=f"{w.config.host}/serving-endpoints")
 
     try:
         response = client.chat.completions.create(
@@ -813,7 +814,7 @@ print(f"Answer: {result_3['answer'][:200]}")
 
 # MAGIC %md
 # MAGIC ## Register Model to Unity Catalog
-# MAGIC 
+# MAGIC
 # MAGIC Uncomment and run to register the router as an MLflow model in UC.
 
 # COMMAND ----------
