@@ -138,6 +138,38 @@ When the gate says NO, the analytical lane forwards to the Genie Space for dynam
 - Instructions: "Always answer directly, never ask clarifying questions"
 - Deployed as a DABs resource (`engine: direct` required for Genie resources)
 
+### SQL Auto-Correction (Post-Genie)
+
+Genie occasionally generates SQL with syntax errors — most commonly **unquoted string literals** (e.g., `WHERE period = Q2 2025` instead of `WHERE period = 'Q2 2025'`). These would fail if executed or if saved to the draft table for certification.
+
+The system applies a **two-tier correction** after every Genie response and when loading draft entries for SME review:
+
+| Tier | Method | Latency | Coverage |
+| --- | --- | --- | --- |
+| 1 (fast path) | Regex pattern matching | <1ms | Multi-word unquoted strings after `=`, `!=`, `<>` |
+| 2 (fallback) | LLM (`databricks-meta-llama-3-3-70b-instruct`) | ~1-2s | All other syntax issues |
+
+**Regex fast path** — detects unquoted multi-word values by identifying tokens after comparison operators that contain spaces but are not SQL keywords. Examples:
+- `WHERE period = Q2 2025 AND ...` → `WHERE period = 'Q2 2025' AND ...`
+- `WHERE region = North America GROUP BY` → `WHERE region = 'North America' GROUP BY`
+
+**LLM fallback** — if regex finds no issues, the SQL is sent to the LLM with a strict prompt:
+- Fix ONLY syntax errors (unquoted strings, missing quotes)
+- Do NOT change table names, column names, aliases, or query structure
+- Do NOT add LIMIT, ORDER BY, or any new clauses
+- Return corrected SQL only (no markdown, no explanation)
+
+**Safety guardrails:**
+- Sanity check: LLM output must start with `SELECT` or `WITH` to be accepted
+- Non-blocking: if LLM call fails (auth, timeout), original SQL is returned unchanged
+- Single-word values are never auto-quoted (could be column references)
+
+**Where it runs:**
+1. `genie_service.py` → `_extract_result()` — corrects SQL immediately after Genie returns
+2. `corpus_routes.py` → `api_corpus_draft_detail()` — corrects SQL when SME opens a draft for review
+
+This ensures the SME Review page always shows syntactically valid SQL, and "Run Modified Query" works without manual fixing.
+
 ---
 
 ## 5. Certification Flywheel
@@ -152,7 +184,9 @@ The certification flywheel is the mechanism by which the system self-improves ov
 - Test data uses TRUNCATE + append (not `mode("overwrite")`) to preserve CDF
 - Certified entries get a 180-day `next_review_date` (staleness gate)
 - The Review page allows SQL modification before certification (SME can fix the query)
+- **SQL auto-correction on view**: When an SME opens a draft, the SQL is automatically corrected (regex + LLM) before display — the SME sees valid SQL in the editor without manual fixing
 - **SQL validation gate**: Before certification, `EXPLAIN` is run against the SQL to catch syntax errors (e.g., malformed regex, unquoted literals). Parameter placeholders (`:param`) are substituted with dummy values for validation. If validation fails, certify returns HTTP 422 with the error — the entry remains in draft.
+- **Run Query endpoint**: Strips trailing semicolons and only appends `LIMIT 50` if no LIMIT is already present
 
 ---
 
