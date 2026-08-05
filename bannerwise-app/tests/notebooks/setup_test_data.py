@@ -168,7 +168,9 @@ corpus_schema = StructType([
 ])
 
 corpus_df = spark.createDataFrame(corpus_rows, schema=corpus_schema)
-corpus_df.write.mode("overwrite").saveAsTable(f"{catalog_name}.{schema_name}.certified_qa_corpus")
+# TRUNCATE + append to preserve CDF (required for Vector Search Delta Sync)
+spark.sql(f"TRUNCATE TABLE {catalog_name}.{schema_name}.certified_qa_corpus")
+corpus_df.write.mode("append").saveAsTable(f"{catalog_name}.{schema_name}.certified_qa_corpus")
 print(f"✓ Wrote {corpus_df.count()} rows to certified_qa_corpus")
 
 # COMMAND ----------
