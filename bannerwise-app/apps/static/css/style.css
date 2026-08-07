@@ -1063,3 +1063,52 @@ code {
         grid-template-columns: 1fr;
     }
 }
+
+/* --- Markdown Table Styling --- */
+.md-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.75rem 0;
+    font-size: 0.9em;
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0, 40, 85, 0.06);
+    border: 1px solid var(--color-border);
+}
+
+.md-table thead tr {
+    background: var(--color-primary);
+    color: #ffffff;
+    text-align: left;
+}
+
+.md-table th {
+    padding: 0.6rem 1rem;
+    font-weight: 600;
+    font-size: 0.85em;
+    letter-spacing: 0.02em;
+    text-transform: capitalize;
+}
+
+.md-table td {
+    padding: 0.55rem 1rem;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+}
+
+.md-table tbody tr {
+    background: var(--color-card);
+    transition: background var(--transition);
+}
+
+.md-table tbody tr:nth-child(even) {
+    background: var(--color-bg);
+}
+
+.md-table tbody tr:hover {
+    background: var(--color-secondary-light);
+}
+
+.md-table tbody tr:last-child td {
+    border-bottom: none;
+}

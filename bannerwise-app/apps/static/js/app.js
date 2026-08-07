@@ -548,6 +548,12 @@ function formatAnswer(str) {
         } catch (e) { /* fall through to text rendering */ }
     }
 
+    // Detect markdown tables (lines starting with |) and render as HTML
+    if (str.includes('|') && str.includes('---')) {
+        str = renderMarkdownTables(str);
+        return str;
+    }
+
     // Escape HTML first for safety
     let safe = escapeHtml(str);
     // Convert **bold** to <strong>
@@ -555,6 +561,66 @@ function formatAnswer(str) {
     // Convert newlines to <br> for readability
     safe = safe.replace(/\n/g, '<br>');
     return safe;
+}
+
+function renderMarkdownTables(str) {
+    // Split into lines and process markdown tables mixed with text
+    const lines = str.split('\n');
+    let html = '';
+    let tableLines = [];
+    let inTable = false;
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        const isTableRow = line.startsWith('|') && line.endsWith('|');
+
+        if (isTableRow) {
+            inTable = true;
+            tableLines.push(line);
+        } else {
+            if (inTable) {
+                // End of table block — render it
+                html += convertMarkdownTable(tableLines);
+                tableLines = [];
+                inTable = false;
+            }
+            // Render non-table line as text
+            if (line) {
+                let safe = escapeHtml(line);
+                safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+                safe = safe.replace(/_(.+?)_/g, '<em>$1</em>');
+                html += `<p style="margin:0.5rem 0">${safe}</p>`;
+            }
+        }
+    }
+
+    // Handle trailing table
+    if (inTable && tableLines.length > 0) {
+        html += convertMarkdownTable(tableLines);
+    }
+
+    return html;
+}
+
+function convertMarkdownTable(tableLines) {
+    if (tableLines.length < 2) return escapeHtml(tableLines.join('\n'));
+
+    // Parse cells from pipe-delimited rows
+    const parseRow = (line) => line.split('|').slice(1, -1).map(c => c.trim());
+
+    const headers = parseRow(tableLines[0]);
+    // Skip separator row (index 1: | --- | --- |)
+    const dataRows = tableLines.slice(2).map(parseRow);
+
+    let html = '<table class="md-table">';
+    html += '<thead><tr>' + headers.map(h =>
+        `<th>${escapeHtml(formatKey(h))}</th>`
+    ).join('') + '</tr></thead>';
+    html += '<tbody>' + dataRows.map(row =>
+        '<tr>' + row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('') + '</tr>'
+    ).join('') + '</tbody></table>';
+
+    return html;
 }
 
 function renderResultTable(rows) {
