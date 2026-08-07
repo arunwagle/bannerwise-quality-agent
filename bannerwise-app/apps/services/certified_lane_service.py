@@ -137,6 +137,111 @@ Return ONLY the JSON object, no explanation."""
         return {p: "unknown" for p in parameters}
 
 
+def _validate_parameters(w, parameterized_sql: str, params: dict) -> dict:
+    """Validate extracted parameters against actual data in the database.
+
+    Parses the SQL to find WHERE column = :param patterns, then checks if
+    the extracted value exists in that column. Returns a validation result dict.
+
+    Returns:
+        {
+            "valid": True/False,
+            "invalid_params": {"campaign": {"value": "Black Friday", "column": "campaign_name",
+                                            "available": ["summer", "holiday", ...]}},
+            "suggestions": "Did you mean 'summer'? Available: summer, holiday, spring_sale, ..."
+        }
+    """
+    if not params:
+        return {"valid": True, "invalid_params": {}, "suggestions": None}
+
+    # Parse SQL to find WHERE column = :param patterns
+    # Matches: column_name = :param_name, column_name = :param_name (with optional spaces)
+    where_patterns = re.findall(
+        r'(\w+)\s*=\s*:(\w+)',
+        parameterized_sql
+    )
+
+    if not where_patterns:
+        return {"valid": True, "invalid_params": {}, "suggestions": None}
+
+    # Extract table name from SQL (FROM clause)
+    table_match = re.search(r'FROM\s+([\w.]+)', parameterized_sql, re.IGNORECASE)
+    if not table_match:
+        return {"valid": True, "invalid_params": {}, "suggestions": None}
+
+    table_name = table_match.group(1)
+
+    invalid_params = {}
+    for column_name, param_name in where_patterns:
+        if param_name not in params or params[param_name] == "unknown":
+            continue
+
+        extracted_value = params[param_name]
+
+        # Query distinct values for this column (with LIMIT for safety)
+        try:
+            check_sql = f"SELECT DISTINCT {column_name} FROM {table_name} ORDER BY {column_name} LIMIT 50"
+            response = w.statement_execution.execute_statement(
+                statement=check_sql,
+                warehouse_id=SQL_WAREHOUSE_ID,
+                catalog=CATALOG,
+                schema=SCHEMA,
+                wait_timeout="15s",
+            )
+
+            if response.status.state == StatementState.SUCCEEDED and response.result:
+                available_values = [
+                    row[0] for row in response.result.data_array if row[0] is not None
+                ]
+
+                # Check if extracted value matches any available value (case-insensitive)
+                value_lower = extracted_value.lower().strip()
+                available_lower = {v.lower(): v for v in available_values}
+
+                if value_lower not in available_lower:
+                    # Find closest matches (simple substring containment)
+                    close_matches = [
+                        v for v in available_values
+                        if value_lower in v.lower() or v.lower() in value_lower
+                    ]
+                    invalid_params[param_name] = {
+                        "value": extracted_value,
+                        "column": column_name,
+                        "available": available_values,
+                        "close_matches": close_matches,
+                    }
+                else:
+                    # Fix case to match actual data value
+                    params[param_name] = available_lower[value_lower]
+        except Exception as e:
+            logger.warning(f"Parameter validation query failed for {param_name}: {e}")
+            continue
+
+    if invalid_params:
+        # Build suggestion message
+        suggestions = []
+        for pname, info in invalid_params.items():
+            if info["close_matches"]:
+                suggestions.append(
+                    f"'{info['value']}' not found in `{info['column']}`. "
+                    f"Did you mean: **{', '.join(info['close_matches'])}**?"
+                )
+            else:
+                available_display = ', '.join(info['available'][:10])
+                suggestions.append(
+                    f"No '{info['value']}' found in `{info['column']}`. "
+                    f"Available values: **{available_display}**"
+                    + (f" (and {len(info['available']) - 10} more)" if len(info['available']) > 10 else "")
+                )
+        return {
+            "valid": False,
+            "invalid_params": invalid_params,
+            "suggestions": "\n".join(suggestions),
+        }
+
+    return {"valid": True, "invalid_params": {}, "suggestions": None}
+
+
 def _bind_sql(parameterized_sql: str, params: dict) -> str:
     """Bind extracted parameters into the SQL template.
 
@@ -194,17 +299,8 @@ def _format_answer(answer_template: str, params: dict, sql_results: list) -> str
 
     import string
 
-    # Build results_table (markdown table from ALL rows) for templates that reference it
-    columns = list(sql_results[0].keys())
-    table_lines = ["| " + " | ".join(columns) + " |"]
-    table_lines.append("| " + " | ".join(["---"] * len(columns)) + " |")
-    for row in sql_results[:20]:  # Cap at 20 rows
-        table_lines.append("| " + " | ".join(str(row.get(c, "")) for c in columns) + " |")
-    results_table = "\n".join(table_lines)
-
-    # Merge params + first row of results + results_table into a single context dict
+    # Merge params + first row of results into a single context dict
     context = dict(params)
-    context["results_table"] = results_table
     first_row = sql_results[0]
     has_null_values = False
     for col, val in first_row.items():
@@ -275,14 +371,31 @@ def execute_certified_lane(prompt: str, corpus_id: str, matched_question: str) -
         params = _extract_parameters(w, prompt, parameters, matched_question)
         logger.info(f"Extracted params: {params}")
 
-        # Step 3: Bind parameters into SQL
+        # Step 3: Validate parameters against actual data
+        validation = _validate_parameters(w, parameterized_sql, params)
+        if not validation["valid"]:
+            # Parameters don't exist in data — return helpful message instead of NULL results
+            latency_ms = int((time.time() - start_time) * 1000)
+            bound_sql = _bind_sql(parameterized_sql, params)  # still show what would have run
+            return {
+                "answer": f"The query matched a certified template, but the specified parameter values don't exist in the data.\n\n{validation['suggestions']}",
+                "sql_executed": bound_sql,
+                "params_extracted": params,
+                "raw_results": [],
+                "answer_template": answer_template,
+                "latency_ms": latency_ms,
+                "error": None,
+                "param_validation": validation["suggestions"],
+            }
+
+        # Step 4: Bind parameters into SQL (params may have been case-corrected by validation)
         bound_sql = _bind_sql(parameterized_sql, params)
         logger.info(f"Bound SQL: {bound_sql}")
 
-        # Step 4: Execute SQL
+        # Step 5: Execute SQL
         results = _execute_sql(w, bound_sql)
 
-        # Step 5: Format answer
+        # Step 6: Format answer
         answer = _format_answer(answer_template, params, results)
 
         latency_ms = int((time.time() - start_time) * 1000)
