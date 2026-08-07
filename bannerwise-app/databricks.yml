@@ -26,7 +26,7 @@ variables:
     description: UC registered model name
 
   confidence_threshold:
-    default: '0.5'
+    default: '0.65'
     description: Confidence gate threshold for certified lane routing
   shrink_factor:
     default: '1.0'
