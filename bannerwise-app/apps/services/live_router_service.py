@@ -79,6 +79,8 @@ def assess_prompt(prompt: str) -> dict:
             reason = provenance.get("reason", prediction.get("reason", ""))
             threshold_used = provenance.get("threshold_used", prediction.get("threshold_used", 0.5))
             candidates_evaluated = provenance.get("candidates_evaluated", prediction.get("candidates_evaluated", 0))
+            search_type = provenance.get("search_type", prediction.get("search_type", "ANN"))
+            agent_version = provenance.get("agent_version", prediction.get("agent_version", "unknown"))
             error = prediction.get("error") or provenance.get("error")
         else:
             lane = "analytical"
@@ -117,6 +119,8 @@ def assess_prompt(prompt: str) -> dict:
                     "reason": reason,
                     "threshold_used": threshold_used,
                     "candidates_evaluated": candidates_evaluated,
+                    "search_type": search_type,
+                    "agent_version": agent_version,
                     "endpoint": ENDPOINT_NAME,
                     "sql_executed": certified_result.get("sql_executed"),
                     "params_extracted": certified_result.get("params_extracted"),
@@ -148,6 +152,8 @@ def assess_prompt(prompt: str) -> dict:
                     "reason": reason,
                     "threshold_used": threshold_used,
                     "candidates_evaluated": candidates_evaluated,
+                    "search_type": search_type,
+                    "agent_version": agent_version,
                     "endpoint": ENDPOINT_NAME,
                 },
                 "latency_ms": int((time.time() - start_time) * 1000),
