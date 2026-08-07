@@ -548,10 +548,12 @@ function formatAnswer(str) {
         } catch (e) { /* fall through to text rendering */ }
     }
 
-    // Detect markdown tables (lines starting with |) and render as HTML
-    if (str.includes('|') && str.includes('---')) {
-        str = renderMarkdownTables(str);
-        return str;
+    // Detect markdown tables: require at least one line matching "| x | y |" pattern
+    // AND a separator line like "| --- | --- |" to avoid false positives on casual text
+    const hasTableRows = /^\|.+\|$/m.test(str);
+    const hasSeparator = /^\|\s*-{3,}\s*\|/m.test(str);
+    if (hasTableRows && hasSeparator) {
+        return renderMarkdownTables(str);
     }
 
     // Escape HTML first for safety
@@ -569,6 +571,7 @@ function renderMarkdownTables(str) {
     let html = '';
     let tableLines = [];
     let inTable = false;
+    let foundTable = false;
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -583,6 +586,7 @@ function renderMarkdownTables(str) {
                 html += convertMarkdownTable(tableLines);
                 tableLines = [];
                 inTable = false;
+                foundTable = true;
             }
             // Render non-table line as text
             if (line) {
@@ -597,6 +601,15 @@ function renderMarkdownTables(str) {
     // Handle trailing table
     if (inTable && tableLines.length > 0) {
         html += convertMarkdownTable(tableLines);
+        foundTable = true;
+    }
+
+    // Safety fallback: if no table was actually rendered, return plain text
+    if (!foundTable) {
+        let safe = escapeHtml(str);
+        safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        safe = safe.replace(/\n/g, '<br>');
+        return safe;
     }
 
     return html;
