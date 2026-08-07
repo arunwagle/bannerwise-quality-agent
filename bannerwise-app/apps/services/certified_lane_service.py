@@ -179,6 +179,8 @@ def _format_answer(answer_template: str, params: dict, sql_results: list) -> str
     if not sql_results:
         return f"No data found for the given parameters: {params}"
 
+    import string
+
     # Merge params + first row of results into a single context dict
     context = dict(params)
     first_row = sql_results[0]
@@ -194,15 +196,33 @@ def _format_answer(answer_template: str, params: dict, sql_results: list) -> str
             except (ValueError, TypeError):
                 context[col] = val
 
-    # Format the template with the context
+    # Format the template with the context — use safe fallback for missing keys
     try:
         formatted = answer_template.format(**context)
-        if has_null_values:
-            formatted += "\n\n_Note: Some values returned as NULL — the specified parameters may not have matching data._"
-    except (KeyError, ValueError, TypeError) as e:
-        # Fallback: show raw results if template fails
+    except (KeyError, IndexError) as e:
+        # Missing key in template — fill missing keys with "N/A" and retry
+        logger.warning(f"Template key missing: {e}, retrying with defaults")
+        # Parse template field names and provide defaults for any missing ones
+        formatter = string.Formatter()
+        for _, field_name, _, _ in formatter.parse(answer_template):
+            if field_name and field_name.split(".")[0].split("[")[0] not in context:
+                context[field_name.split(".")[0].split("[")[0]] = "N/A"
+        try:
+            formatted = answer_template.format(**context)
+        except Exception:
+            formatted = None
+    except (ValueError, TypeError) as e:
         logger.warning(f"Template formatting failed: {e}")
-        formatted = f"Query returned results but template formatting failed: {first_row}"
+        formatted = None
+
+    # Final fallback: build a readable answer from raw results
+    if not formatted:
+        cols = list(first_row.keys())
+        vals = [f"**{k}**: {v}" for k, v in first_row.items() if v is not None]
+        formatted = f"Query result: {', '.join(vals)}"
+
+    if has_null_values:
+        formatted += "\n\n_Note: Some values returned as NULL — the specified parameters may not have matching data._"
 
     return formatted
 
