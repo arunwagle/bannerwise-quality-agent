@@ -27,6 +27,10 @@
 
 import os
 
+# --- Agent Version (increment on each meaningful change) ---
+AGENT_VERSION = "2.1.0"  # 2.1.0: hybrid search + relaxed judge prompt
+VS_QUERY_TYPE = "HYBRID"  # HYBRID = vector + BM25 via RRF; ANN = vector only
+
 # --- Configurable Parameters (passed via job base_parameters or widgets) ---
 dbutils.widgets.text("catalog_name", "aw_serverless_stable_catalog")
 dbutils.widgets.text("schema_name", "bannerhealth")
@@ -143,6 +147,7 @@ def retrieve(prompt: str, top_k: int = VS_TOP_K) -> List[Candidate]:
                 "next_review_date"
             ],
             query_text=prompt,
+            query_type="HYBRID",  # Combines vector + BM25 keyword matching via RRF
             num_results=top_k,
             filters_json='{"status NOT": "expired"}'
         )
@@ -687,6 +692,8 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
             # No candidates — go directly to analytical lane
             result = execute_analytical_lane(prompt, short_circuit.confidence)
             result.provenance["short_circuit"] = True
+            result.provenance["agent_version"] = AGENT_VERSION
+            result.provenance["search_type"] = VS_QUERY_TYPE
             _log_to_history(prompt, result)
             return result.to_dict()
 
@@ -710,6 +717,12 @@ class BannerwiseQualityRouter(mlflow.pyfunc.PythonModel):
                 "question": top_candidate.question,
                 "vs_score": top_candidate.score,
             }
+
+        # Inject agent metadata into provenance (always present for debugging)
+        result.provenance["agent_version"] = AGENT_VERSION
+        result.provenance["search_type"] = VS_QUERY_TYPE
+        result.provenance["vs_score"] = top_candidate.score
+        result.provenance["threshold_used"] = self.threshold
 
         # Log to query history
         _log_to_history(prompt, result)
