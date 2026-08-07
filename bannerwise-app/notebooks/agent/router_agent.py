@@ -254,10 +254,12 @@ Examples of MATCH:
 - Template: "What is the cost per acquisition by channel?" ← "what's CPA by channel?" (standard abbreviation)
 - Template: "Which geographic regions show the highest banner engagement?" ← "What areas of the world have the most interactive banner clicks?" (same analysis, different phrasing)
 - Template: "What is the viewability rate for our banner inventory?" ← "What percentage of our banner ads are actually seen in Q1 2025?" (same metric + time period = MATCH)
+- Template: "How does performance compare across ad networks?" ← "Compare CTR across all ad networks" (CTR is a specific performance metric — asking for a SUBSET of what the template measures is MATCH)
+- Template: "How does performance compare across ad networks?" ← "What are the impressions by ad network?" (impressions is one performance metric returned by the template)
 
 Rules for MATCH — answer MATCH when ALL are true:
 1. The user asks for exactly ONE metric/analysis (not two or more combined)
-2. That single metric is the SAME as what the template measures (paraphrases, synonyms, abbreviations, concept rewrites, and typos all count as the same metric)
+2. That single metric is the SAME as what the template measures, OR is a specific subset of a broader template (e.g. "CTR" is a specific performance metric within a broader "performance comparison" template). Paraphrases, synonyms, abbreviations, concept rewrites, and typos all count as the same metric.
 3. Any additional specificity (time periods, campaign names, regions, channels) is acceptable — the certified SQL returns results that contain or can be filtered to the user's answer
 
 Examples of NO_MATCH:
