@@ -14,6 +14,33 @@ logger = logging.getLogger(__name__)
 ENDPOINT_NAME = os.environ.get("SERVING_ENDPOINT_NAME", "bannerwise-quality-router")
 
 
+def _build_routing_reason(lane: str, vs_score: float, judge_verdict: str,
+                          matched_question: str, corpus_id: str) -> str:
+    """Generate a human-readable explanation of why the query was routed to this lane."""
+    vs_pct = round(vs_score * 100, 1) if vs_score else 0
+
+    if lane == "certified":
+        return f"Intent matches certified question ({corpus_id}): \"{matched_question}\""
+
+    # Analytical lane — explain why
+    if not corpus_id or vs_pct < 30:
+        return "No relevant match found in the certified corpus — answered by Genie."
+
+    if vs_pct >= 70:
+        # High VS score but judge said NO — the interesting case
+        return (
+            f"Closest certified match: \"{matched_question}\" ({corpus_id}, "
+            f"VS similarity: {vs_pct}%), but the LLM Judge determined the intent differs "
+            f"— your question asks something fundamentally different. Answered by Genie."
+        )
+
+    # Moderate VS score
+    return (
+        f"Best corpus match was \"{matched_question}\" ({corpus_id}, "
+        f"VS similarity: {vs_pct}%) — not close enough for certification. Answered by Genie."
+    )
+
+
 def _get_client():
     """Get authenticated WorkspaceClient (auto-configures in Apps runtime)."""
     return WorkspaceClient()
@@ -94,6 +121,11 @@ def assess_prompt(prompt: str) -> dict:
             candidates_evaluated = 0
             error = reason
 
+        # Generate a human-readable routing reason
+        routing_reason = _build_routing_reason(
+            lane, vs_score, judge_verdict, matched_question, corpus_id
+        )
+
         if lane == "certified":
             # Execute Certified Lane: lookup SQL, extract params, execute, format answer
             from services.certified_lane_service import execute_certified_lane
@@ -111,6 +143,7 @@ def assess_prompt(prompt: str) -> dict:
                 "badge": "Certified",
                 "confidence": round(confidence, 3),
                 "lane": "certified",
+                "routing_reason": routing_reason,
                 "provenance": {
                     "corpus_id": corpus_id,
                     "matched_question": matched_question,
@@ -125,6 +158,7 @@ def assess_prompt(prompt: str) -> dict:
                     "sql_executed": certified_result.get("sql_executed"),
                     "params_extracted": certified_result.get("params_extracted"),
                     "answer_template": certified_result.get("answer_template"),
+                    "param_validation": certified_result.get("param_validation"),
                 },
                 "latency_ms": total_latency,
             }
@@ -139,6 +173,7 @@ def assess_prompt(prompt: str) -> dict:
                 "badge": "Not Certified",
                 "confidence": round(confidence, 3),
                 "lane": "analytical",
+                "routing_reason": routing_reason,
                 "sql_executed": genie_result.get("sql_executed"),
                 "provenance": {
                     "source": "genie_space",

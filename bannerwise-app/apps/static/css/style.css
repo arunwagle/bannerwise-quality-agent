@@ -1064,6 +1064,24 @@ code {
     }
 }
 
+/* --- Routing Reason --- */
+.routing-reason {
+    padding: 0.5rem 0.75rem;
+    margin: 0.5rem 0;
+    font-size: 0.85em;
+    color: var(--color-text-muted);
+    background: var(--color-hover);
+    border-left: 3px solid var(--color-secondary);
+    border-radius: var(--radius-sm);
+    line-height: 1.5;
+}
+
+.latency-display {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    font-weight: 400;
+}
+
 /* --- Markdown Table Styling --- */
 .md-table {
     width: 100%;

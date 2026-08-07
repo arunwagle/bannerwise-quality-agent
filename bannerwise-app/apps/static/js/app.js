@@ -54,8 +54,9 @@ function renderResponse(result) {
         <div class="response-card">
             <div class="response-badge ${isCertified ? 'badge-certified' : 'badge-analytical'}">
                 <span>${isCertified ? '\u2705' : '\u26A0\uFE0F'} ${result.badge}</span>
-                <span class="confidence-display">Confidence: ${(result.confidence * 100).toFixed(1)}%</span>
+                <span class="latency-display">${result.latency_ms || 0}ms</span>
             </div>
+            ${result.routing_reason ? `<div class="routing-reason"><strong>Reason:</strong> ${escapeHtml(result.routing_reason)}</div>` : ''}
             <div class="response-body">
                 <div class="response-answer">${formatAnswer(result.answer)}</div>
                 ${!isCertified ? `
@@ -402,12 +403,15 @@ function renderDemoResult(result) {
     const vsScore = result.provenance?.vs_score ? (result.provenance.vs_score * 100).toFixed(1) + '%' : '\u2014';
     const sqlExecuted = result.provenance?.sql_executed || result.sql_executed || '';
 
+    const routingReason = result.routing_reason || '';
+
     return `
         <div class="demo-result-card">
             <div class="demo-result-header">
                 <span class="badge ${badgeClass}">${badge}</span>
-                <span class="demo-meta">Confidence: ${confidence}% | Latency: ${latency}ms</span>
+                <span class="demo-meta">Latency: ${latency}ms</span>
             </div>
+            ${routingReason ? `<div class="routing-reason"><strong>Reason:</strong> ${escapeHtml(routingReason)}</div>` : ''}
             <div class="demo-result-provenance">
                 <span><strong>Corpus ID:</strong> ${corpusId}</span>
                 <span><strong>VS Score:</strong> ${vsScore}</span>
