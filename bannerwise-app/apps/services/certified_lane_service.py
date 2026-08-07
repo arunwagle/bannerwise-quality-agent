@@ -182,20 +182,27 @@ def _format_answer(answer_template: str, params: dict, sql_results: list) -> str
     # Merge params + first row of results into a single context dict
     context = dict(params)
     first_row = sql_results[0]
+    has_null_values = False
     for col, val in first_row.items():
-        # Try to convert numeric strings
-        try:
-            context[col] = float(val)
-        except (ValueError, TypeError):
-            context[col] = val
+        if val is None:
+            has_null_values = True
+            context[col] = 0  # Safe default for format specs like :.2f
+        else:
+            # Try to convert numeric strings
+            try:
+                context[col] = float(val)
+            except (ValueError, TypeError):
+                context[col] = val
 
     # Format the template with the context
     try:
         formatted = answer_template.format(**context)
-    except (KeyError, ValueError) as e:
+        if has_null_values:
+            formatted += "\n\n_Note: Some values returned as NULL — the specified parameters may not have matching data._"
+    except (KeyError, ValueError, TypeError) as e:
         # Fallback: show raw results if template fails
         logger.warning(f"Template formatting failed: {e}")
-        formatted = f"Result: {first_row}"
+        formatted = f"Query returned results but template formatting failed: {first_row}"
 
     return formatted
 
