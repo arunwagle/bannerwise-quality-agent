@@ -25,17 +25,35 @@ The user's prompt is embedded using `databricks-bge-large-en` and compared again
 | --- | --- |
 | Embedding Model | `databricks-bge-large-en` |
 | Index | `aw_serverless_stable_catalog.bannerhealth.certified_qa_index` |
+| Embedding Source Column | `embedding_text` (NOT `question`) |
 | Sync Mode | Delta Sync (TRIGGERED — manually synced on certify action) |
 | Top-K | 3 candidates |
 | Similarity | Cosine |
-| Fields Returned | `corpus_id`, `question`, `score`, `status`, `parameterized_sql`, `answer_template`, `parameters` |
+| Fields Returned | `corpus_id`, `question`, `embedding_text`, `score`, `status`, `parameterized_sql`, `answer_template`, `parameters` |
 | CDF Requirement | Source table must have Change Data Feed enabled for Delta Sync |
+
+**Dual-Column Embedding Strategy:**
+
+The corpus table has two text columns for different purposes:
+
+| Column | Purpose | Example |
+| --- | --- | --- |
+| `question` | Display + LLM Judge (keeps `{param}` placeholders) | "What is the total ad spend for {period}?" |
+| `embedding_text` | VS embedding + retrieval (params stripped for intent matching) | "What is the total ad spend?" |
+
+**Why?** The embedding model (`bge-large-en`) treats `{period}` as a literal token, not a variable. When a user asks "What is the total ad spend for Q1 2025?", the cosine similarity against "...for {period}?" is only ~0.68. Against the stripped version "...total ad spend?" it's ~0.82+. This is because stripping parameters forces the embedding to focus on **analytical intent** rather than matching parameter tokens.
+
+The `generate_embedding_text()` function strips `{param}` placeholders and removes trailing dangling prepositions:
+- "What is the total ad spend for {period}?" → "What is the total ad spend?"
+- "How many impressions did the {campaign} campaign generate?" → "How many impressions did the campaign generate?"
+- "What is the click-through rate by banner size?" → unchanged (no params)
 
 **How it works:**
 - Vector Search returns candidates ranked by cosine similarity (0.0–1.0)
-- A score of 0.68+ typically indicates a reasonable semantic match
+- Embedding is computed on `embedding_text` (stripped of parameters) for better intent matching
+- A score of 0.80+ typically indicates a strong semantic match (improved from 0.68 with old approach)
 - However, **VS score alone is insufficient** for routing — two questions can have high similarity but different intent (e.g., "ROI for summer campaign" vs. "highest ROI campaign")
-- That's why Step 2 (LLM Judge) is critical
+- That's why Step 2 (LLM Judge) uses the original `question` (with `{param}` placeholders) — the LLM understands parameterization
 
 **Possible Enhancements:**
 - **Hybrid search**: Combine vector similarity with keyword/BM25 matching for better recall on short queries
@@ -43,6 +61,7 @@ The user's prompt is embedded using `databricks-bge-large-en` and compared again
 - **Dynamic top-k**: Increase k for ambiguous queries, decrease for high-confidence single matches
 - **Embedding fine-tuning**: Train a domain-specific embedding model on Banner Health's Q&A pairs
 - **Multi-index retrieval**: Separate indexes for different question categories (spend, performance, attribution)
+- **Multiple example phrasings**: Store 3-5 representative queries per corpus entry for embedding
 
 ---
 
@@ -194,7 +213,7 @@ The certification flywheel is the mechanism by which the system self-improves ov
 
 ### Deployment Order
 
-The jobs must be run in sequence for a fresh deployment:
+The jobs must be run in this order for a fresh deployment (access job runs last because it grants permissions on resources created by earlier jobs):
 
 <!-- Diagram: docs/diagrams/05_deployment_order.drawio -->
 ![Deployment Order](diagrams/05_deployment_order.drawio.png)
@@ -203,60 +222,54 @@ The jobs must be run in sequence for a fresh deployment:
 
 ### Job 1: `bannerwise-quality-agent-setup`
 
-**Purpose:** Initialize the data layer — create schema, tables, and populate with synthetic data.
+**Purpose:** Full clean-slate initialization — resets the VS index, creates all tables, and populates with data. Run this once for a fresh deployment or whenever a complete reset is needed.
 
 | Task | Notebook | Depends On | Actions |
 | --- | --- | --- | --- |
-| `create_schema_and_tables` | `notebooks/data/create_tables` | — | Creates all system + analytics tables (with CDF on corpus) |
-| `create_analytics_tables` | `notebooks/data/create_synthetic_data` | `create_schema_and_tables` | Generates 9 analytics tables + seeds corpus with 20 entries |
+| `reset_vector_index` | `notebooks/vs/cleanup_vector_index` | — | Removes stale VS index (may be bound to a destroyed endpoint after bundle destroy/redeploy). Handles "not found" gracefully. |
+| `create_system_tables` | `notebooks/data/create_tables` | — | Creates system tables (corpus w/ CDF, draft, history, review queue) using `CREATE OR REPLACE TABLE` |
+| `seed_corpus` | `tests/notebooks/setup_test_data` | `create_system_tables` | Seeds 20 certified QA entries with auto-generated `embedding_text` |
+| `create_app_tables` | `notebooks/data/create_synthetic_data` | `create_system_tables` | Creates and populates 9 analytics tables used by certified SQL templates and Genie Space |
+
+**Task parallelism:** `reset_vector_index` and `create_system_tables` run in parallel (no dependency). `seed_corpus` and `create_app_tables` run in parallel after `create_system_tables` completes.
 
 **Parameters passed:** `catalog_name`, `schema_name`
 
+**DDL Strategy:** System tables use `CREATE OR REPLACE TABLE` (always applies latest schema, idempotent on re-run). CDF is enabled on `certified_qa_corpus` for VS Delta Sync. Analytics tables also use `CREATE OR REPLACE` with inline INSERT.
+
+**Why reset VS index here?** After `bundle destroy` + redeploy, the VS endpoint gets a new internal ID but a stale index may still reference the old endpoint. The `vector_index_job` (Job 3) would fail with "endpoint not found" unless the stale index is removed first.
+
+**Staleness invariant:** Stale entries (past `next_review_date`) must not exceed **10%** of the corpus. The seed data includes 2 stale entries (10%) for testing the staleness check. The eval pipeline tolerates staleness-caused false negatives proportionally — recall targets account for up to 10% of certified entries being correctly rejected by the staleness gate.
+
 **Tables created:**
-- System: `certified_qa_corpus` (CDF enabled), `certified_qa_corpus_draft`, `query_history`, `sme_review_queue`, `router_eval_dataset`, `router_eval_results`
+- System: `certified_qa_corpus` (CDF enabled + 20 seeded entries), `certified_qa_corpus_draft`, `query_history`, `sme_review_queue`
 - Analytics: `ad_metrics`, `campaign_metrics`, `banner_performance`, `regional_metrics`, `network_metrics`, `channel_metrics`, `session_metrics`, `creative_performance`, `attribution_metrics`
 
 ---
 
-### Job 2: `bannerwise-quality-agent-access`
+### Job 2: `bannerwise-quality-agent-vector-index`
 
-**Purpose:** Grant the application service principal all required permissions. All 4 tasks run in **parallel** (no dependencies between them).
-
-| Task | Notebook | Permissions Granted |
-| --- | --- | --- |
-| `configure_uc_access` | `notebooks/access/setup_uc_access` | USE CATALOG, USE SCHEMA, SELECT, MODIFY + CAN_USE on SQL Warehouse |
-| `configure_vs_access` | `notebooks/access/setup_vs_access` | CAN_USE on VS endpoint `bannerwise-vs-endpoint` |
-| `configure_endpoint_access` | `notebooks/access/setup_endpoint_access` | CAN_QUERY on serving endpoint + LLM endpoint |
-| `configure_genie_access` | `notebooks/access/setup_genie_access` | CAN_RUN on Genie Space (via `/api/2.0/permissions/genie/{id}`) |
-
-**Parameters passed:** `app_sp_id` (from `${resources.apps.bannerwise_quality_agent.service_principal_id}`), resource IDs
-
-**Important note on Genie permissions:** The correct API path is `/api/2.0/permissions/genie/{space_id}` — NOT `/permissions/dashboards/` or `/permissions/genie-spaces/`. This was discovered through trial and error.
-
----
-
-### Job 3: `bannerwise-quality-agent-vector-index`
-
-**Purpose:** Create and populate the Vector Search Delta Sync index.
+**Purpose:** Create the Vector Search Delta Sync index on the certified QA corpus.
 
 | Task | Notebook | Actions |
 | --- | --- | --- |
-| `setup_certified_corpus` | `notebooks/vs/create_vector_search_index` | 1. Verify VS endpoint exists  2. Create Delta Sync index  3. Wait for ONLINE status  4. Verify with test query |
+| `create_vector_search_index` | `notebooks/vs/create_vector_search_index` | 1. Verify VS endpoint exists  2. Create Delta Sync index (or sync if exists)  3. Wait for ONLINE status  4. Verify with test query |
 
 **Index configuration:**
 - Source: `certified_qa_corpus` (requires CDF enabled)
-- Column: `question` → embedded via `databricks-bge-large-en`
+- Embedding column: `embedding_text` → embedded via `databricks-bge-large-en`
 - Sync mode: TRIGGERED (manually triggered on each certify action via `sync_index` API)
-- Columns synced: `id`, `question`, `parameterized_sql`, `answer_template`, `parameters`, `status`, `certified_by`, `certified_date`, `next_review_date`
+- Columns synced: `id`, `question`, `embedding_text`, `parameterized_sql`, `answer_template`, `parameters`, `status`, `certified_by`, `certified_date`, `next_review_date`
 
 **Prerequisites:**
-- `certified_qa_corpus` must exist and have data
+- `certified_qa_corpus` must exist and have data (populated by `setup_job` → `seed_corpus`)
 - CDF must be enabled on the table
 - VS endpoint `bannerwise-vs-endpoint` must be provisioned (by DABs deploy)
+- Stale index must be removed first (handled by `setup_job` → `reset_vector_index`)
 
 ---
 
-### Job 4: `bannerwise-quality-agent-router`
+### Job 3: `bannerwise-quality-agent-router`
 
 **Purpose:** Train the router agent, evaluate it, register as MLflow model, deploy to Model Serving, and configure AI Gateway.
 
@@ -272,9 +285,98 @@ The jobs must be run in sequence for a fresh deployment:
 
 ---
 
+### Job 4: `bannerwise-quality-agent-access`
+
+**Purpose:** Grant the application service principal all required permissions. All 4 tasks run in **parallel** (no dependencies between them).
+
+> **Why last (before eval)?** This job grants permissions on the VS index and serving endpoint — both must exist first (created by Jobs 2 and 3).
+
+| Task | Notebook | Permissions Granted |
+| --- | --- | --- |
+| `configure_uc_access` | `notebooks/access/setup_uc_access` | USE CATALOG, USE SCHEMA, SELECT, MODIFY + CAN_USE on SQL Warehouse |
+| `configure_vs_access` | `notebooks/access/setup_vs_access` | CAN_USE on VS endpoint `bannerwise-vs-endpoint` |
+| `configure_endpoint_access` | `notebooks/access/setup_endpoint_access` | CAN_QUERY on serving endpoint + LLM endpoint |
+| `configure_genie_access` | `notebooks/access/setup_genie_access` | CAN_RUN on Genie Space (via `/api/2.0/permissions/genie/{id}`) |
+
+**Parameters passed:** `app_sp_id` (from `${resources.apps.bannerwise_quality_agent.service_principal_id}`), resource IDs
+
+**Important note on Genie permissions:** The correct API path is `/api/2.0/permissions/genie/{space_id}` — NOT `/permissions/dashboards/` or `/permissions/genie-spaces/`. This was discovered through trial and error.
+
+---
+
 ### Job 5: `bannerwise-quality-agent-eval`
 
 **Purpose:** Standalone evaluation pipeline (can be run independently to re-evaluate after corpus changes).
+
+#### Layered Evaluation Design
+
+The eval separates three independent accuracy layers so we can pinpoint where failures occur:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 1: VS RETRIEVAL ACCURACY (embedding_text target)         │
+│  ─────────────────────────────────────────────────────────      │
+│  Question: Does VS return the correct corpus entry in top-k?    │
+│  Input: User prompt → VS query on embedding_text column         │
+│  Metric: retrieval_hit_rate (correct entry in top-3)            │
+│  Target: >= 0.80 (up from ~0.60 before embedding_text fix)      │
+│  Scope: All rows with expected_corpus_id (positives only)       │
+│                                                                 │
+│  WHY THIS IS THE KEY METRIC:                                    │
+│  The embedding_text column strips {param} placeholders so       │
+│  "What is the total ad spend?" embeds against intent, not       │
+│  literal "{period}" tokens. This is what moves us from 60→80+.  │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 2: JUDGE ACCURACY (given correct VS retrieval)           │
+│  ─────────────────────────────────────────────────────────      │
+│  Question: When VS finds the right entry, does LLM correctly    │
+│            say MATCH or NO_MATCH?                               │
+│  Metrics:                                                       │
+│    judge_precision: MATCH decisions that were correct            │
+│    judge_recall: true matches the judge correctly accepted       │
+│  Target: judge_precision >= 0.90, judge_recall >= 0.85          │
+│  Scope: Only rows where VS retrieved the expected entry         │
+├─────────────────────────────────────────────────────────────────┤
+│  Layer 3: END-TO-END ROUTING                                    │
+│  ─────────────────────────────────────────────────────────      │
+│  Question: Does the full pipeline (VS + Judge + Staleness +     │
+│            Gate) correctly route to certified vs analytical?     │
+│  Metrics:                                                       │
+│    gate_precision: certified predictions that are correct        │
+│    gate_recall: certified questions correctly found              │
+│    staleness_adjusted_recall: recall excluding stale entries     │
+│  Targets:                                                       │
+│    gate_precision >= 0.85                                        │
+│    staleness_adjusted_recall >= 0.80                            │
+│  Note: staleness_adjusted_recall excludes entries with past      │
+│  next_review_date from FN count (they are EXPECTED to fail)     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Deployment Gate Summary
+
+| Gate | Metric | Target | Blocks Deploy? |
+| --- | --- | --- | --- |
+| **Layer 1** | `vs_retrieval_hit_rate` | >= 0.80 | YES |
+| **Layer 2** | `judge_precision` | >= 0.90 | YES |
+| **Layer 2** | `judge_recall` | >= 0.85 | YES |
+| **Layer 3** | `gate_precision` | >= 0.85 | YES |
+| **Layer 3** | `staleness_adjusted_recall` | >= 0.80 | YES |
+| Advisory | `adversarial_rejection_rate` | >= 0.90 | NO |
+| Advisory | `near_miss_rejection_rate` | >= 0.85 | NO |
+| Advisory | `staleness_enforcement` | = 1.00 | NO |
+| Advisory | `latency_p95` | < 5000ms | NO |
+
+#### Staleness Tolerance
+
+Stale entries (past `next_review_date`) account for <= 10% of corpus. These are CORRECTLY rejected by the staleness gate. The eval handles this by:
+1. `stale_entry_test` category expects `analytical` lane (staleness gate fires)
+2. `staleness_adjusted_recall` excludes stale-corpus FNs from the recall denominator
+3. `staleness_enforcement` metric (advisory) verifies 100% of stale entries are rejected
+
+#### Stale Entry Detection
+
+Stale entries are detected by `next_review_date < today()` (NOT by `status == 'expired'` — all entries have status='certified').
 
 | Task | Notebook | Depends On | Actions |
 | --- | --- | --- | --- |
@@ -287,21 +389,6 @@ The jobs must be run in sequence for a fresh deployment:
 - Recall ≥ 0.85 (certified questions are found)
 - F1 ≥ 0.87
 - p95 latency < 5000ms
-
----
-
-### Job 6: `bannerwise-quality-agent-cleanup`
-
-**Purpose:** Tear down all resources (for full reset or decommissioning).
-
-| Task | Depends On | Actions |
-| --- | --- | --- |
-| `cleanup_vector_index` | — | Delete VS index |
-| `cleanup_serving_endpoint` | `cleanup_vector_index` | Delete Model Serving endpoint |
-| `cleanup_registered_model` | `cleanup_serving_endpoint` | Delete registered model from UC |
-| `cleanup_schema` | `cleanup_registered_model` | Drop all tables and schema |
-
-Order matters: remove downstream consumers before deleting upstream resources.
 
 ---
 

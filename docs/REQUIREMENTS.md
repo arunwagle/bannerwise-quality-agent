@@ -18,6 +18,9 @@ A **deterministic, auditable 85% confidence gate** over an SME-certified corpus,
 
 - Create a Vector Search index (`certified_qa_index`) on the certified QA corpus
 - Enables semantic similarity matching between user prompts and certified Q&A pairs
+- **Embedding source column**: Uses `embedding_text` (params stripped) rather than `question` (has `{param}` placeholders)
+- Rationale: embedding models treat `{period}` as a literal token, causing low similarity (0.68) for exact-intent matches. Stripping parameters improves retrieval scores to 0.82+ by focusing on analytical intent
+- The `question` column is still used for LLM Judge comparison (the judge understands parameterization)
 
 ### 3. Router Agent
 

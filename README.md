@@ -150,16 +150,121 @@ See [ROUTER_TEST_DESIGN.md](docs/ROUTER_TEST_DESIGN.md) for detailed evaluation 
 
 ---
 
-## Deployment
+## Getting Started
 
-The entire project is deployed via DABs (`bundle deploy --target dev`):
+### Prerequisites
 
-1. **Setup Job** — Creates schema, tables, and synthetic data
-2. **Access Job** — Grants permissions to the app service principal
-3. **Vector Index Job** — Builds the vector search index from certified corpus
-4. **Router Job** — Trains, evaluates, registers, and deploys the router model
-5. **Genie Space** — Deployed as a DABs resource (9 analytics tables)
-6. **App** — Deployed as a Databricks App with environment variables
+* Databricks workspace with Unity Catalog enabled
+* Databricks CLI installed and authenticated (`databricks auth login`)
+* A catalog and schema where you have CREATE TABLE + MODIFY permissions
+* A SQL Warehouse (serverless recommended)
+* Access to Foundation Model endpoints (`databricks-meta-llama-3-3-70b-instruct`, `databricks-bge-large-en`)
+
+### Step 1 — Deploy the Bundle
+
+```bash
+cd bannerwise-quality-agent/bannerwise-app
+databricks bundle deploy --target dev
+```
+
+This creates all DABs resources: jobs, Genie Space, app definition, and AI Gateway configuration.
+
+### Step 2 — Run the Setup Job
+
+Creates the schema, all tables (including the `embedding_text` column on `certified_qa_corpus`), and populates 9 analytics tables with synthetic data.
+
+```bash
+databricks bundle run setup_job --target dev
+```
+
+**Tables created:** `certified_qa_corpus`, `certified_qa_corpus_draft`, `query_history`, `sme_review_queue`, plus 9 analytics tables.
+
+### Step 3 — Run the Vector Index Job
+
+Creates the Vector Search Delta Sync index on `certified_qa_corpus`. The index embeds the `embedding_text` column (not `question`) using `databricks-bge-large-en` for better intent matching.
+
+```bash
+databricks bundle run vector_index_job --target dev
+```
+
+> **Note:** Wait for the index status to become ONLINE before proceeding (~2-5 minutes).
+
+### Step 4 — Run the Router Agent Job
+
+Trains the router agent (PyFunc model), runs the evaluation pipeline, registers the model in Unity Catalog, promotes to `@champion` alias, and deploys to the serving endpoint.
+
+```bash
+databricks bundle run router_agent_job --target dev
+```
+
+This job includes:
+* Model training with `DatabricksVectorSearchIndex` + `DatabricksServingEndpoint` resource declarations
+* Eval dataset generation + quality gate check
+* Model registration + champion promotion
+* Serving endpoint deployment + AI Gateway configuration
+
+### Step 5 — Run the Access Job
+
+Grants the app service principal all required permissions (UC, SQL Warehouse, VS endpoint, serving endpoints, Genie Space). All 4 tasks run in parallel.
+
+> **Why last?** The access job grants permissions on the VS index and serving endpoint — these resources must exist first.
+
+```bash
+databricks bundle run setup_access_job --target dev
+```
+
+### Step 6 — Deploy the App
+
+```bash
+databricks apps deploy dev-bw-quality-agent --source-code-path bannerwise-app/apps
+```
+
+The app starts with Gunicorn (4 workers) and is accessible at its assigned URL.
+
+### Step 7 — Verify End-to-End
+
+1. Open the app URL
+2. Ask: "What is the total ad spend for Q1 2025?"
+3. Expected: **Certified** badge, answer "$254,500.75", provenance showing QA-0001
+
+---
+
+### Fresh Rebuild (Destroy + Redeploy)
+
+To tear down everything and start fresh:
+
+```bash
+# Destroy existing resources
+databricks bundle destroy --target dev --auto-approve
+
+# Redeploy
+databricks bundle deploy --target dev
+
+# Run jobs in order
+databricks bundle run setup_job --target dev
+databricks bundle run vector_index_job --target dev
+databricks bundle run router_agent_job --target dev
+databricks bundle run setup_access_job --target dev
+
+# Deploy app
+databricks apps deploy dev-bw-quality-agent --source-code-path bannerwise-app/apps
+```
+
+> **Important:** After destroying and recreating the VS index, you must re-run `setup_access_job` — grants are lost when the index is deleted.
+
+---
+
+### Environment Variables (app.yaml)
+
+| Variable | Value | Purpose |
+| --- | --- | --- |
+| `SERVING_ENDPOINT_NAME` | `bannerwise-quality-router` | Router model endpoint |
+| `SQL_WAREHOUSE_ID` | `2d8e531640ffa469` | SQL execution backend |
+| `CATALOG_NAME` | `aw_serverless_stable_catalog` | Unity Catalog catalog |
+| `SCHEMA_NAME` | `bannerhealth` | Schema for all tables |
+| `LLM_ENDPOINT` | `databricks-meta-llama-3-3-70b-instruct` | LLM for SQL correction + judge |
+| `GENIE_SPACE_ID` | `01f19026d0e61c88b840ce168a9be672` | Genie Space for analytical lane |
+| `API_MODE` | `live` | `live` (real endpoint) or `demo` (mock) |
 
 ---
 

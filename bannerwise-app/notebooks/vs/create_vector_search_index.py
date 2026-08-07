@@ -63,7 +63,7 @@ from databricks.sdk.service.vectorsearch import (
 w = WorkspaceClient()
 
 COLUMNS_TO_SYNC = [
-    "id", "question", "parameterized_sql", "answer_template",
+    "id", "question", "embedding_text", "parameterized_sql", "answer_template",
     "parameters", "status", "certified_by", "certified_date", "next_review_date"
 ]
 
@@ -88,7 +88,7 @@ except Exception as e:
                 pipeline_type=PipelineType.TRIGGERED,
                 embedding_source_columns=[
                     EmbeddingSourceColumn(
-                        name="question",
+                        name="embedding_text",
                         embedding_model_endpoint_name=EMBEDDING_MODEL,
                     )
                 ],

@@ -8,6 +8,7 @@ Flow:
 """
 
 import os
+import re
 import json
 import uuid
 import logging
@@ -25,6 +26,18 @@ VS_INDEX_NAME = f"{CATALOG}.{SCHEMA}.certified_qa_index"
 
 DRAFT_TABLE = f"{CATALOG}.{SCHEMA}.certified_qa_corpus_draft"
 CERTIFIED_TABLE = f"{CATALOG}.{SCHEMA}.certified_qa_corpus"
+
+
+def generate_embedding_text(question: str) -> str:
+    """Generate embedding-optimized text by stripping {param} placeholders.
+
+    Decouples RETRIEVAL (VS matching on analytical intent) from
+    VALIDATION (LLM judge uses original parameterized question).
+    """
+    stripped = re.sub(r'\{[^}]+\}', '', question)
+    stripped = re.sub(r'\s+', ' ', stripped).strip()
+    stripped = re.sub(r'\s+(for|in|by|the|this|from)\s*\??$', '?', stripped)
+    return stripped
 
 
 def _get_client():
@@ -251,6 +264,8 @@ def certify_entry(entry_id: str, certified_by: str, modified_sql: str = None) ->
 
     # Escape strings
     question_escaped = draft["question"].replace("'", "''")
+    embedding_text = generate_embedding_text(draft["question"])
+    embedding_text_escaped = embedding_text.replace("'", "''")
     sql_escaped = final_sql.replace("'", "''")
     template_escaped = draft["answer_template"].replace("'", "''")
     certified_by_escaped = certified_by.replace("'", "''")
@@ -258,11 +273,12 @@ def certify_entry(entry_id: str, certified_by: str, modified_sql: str = None) ->
     # 3. Insert into certified table
     insert_sql = f"""
     INSERT INTO {CERTIFIED_TABLE}
-    (id, question, parameterized_sql, answer_template, parameters, status,
+    (id, question, embedding_text, parameterized_sql, answer_template, parameters, status,
      certified_by, certified_date, next_review_date, created_at, updated_at)
     VALUES (
         '{certified_id}',
         '{question_escaped}',
+        '{embedding_text_escaped}',
         '{sql_escaped}',
         '{template_escaped}',
         ARRAY({', '.join(f"'{p}'" for p in draft.get('parameters', []))}),

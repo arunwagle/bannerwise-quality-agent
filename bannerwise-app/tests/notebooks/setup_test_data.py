@@ -34,13 +34,20 @@ spark.sql(f"USE SCHEMA {schema_name}")
 # COMMAND ----------
 
 # DBTITLE 1,Generate certified QA corpus
-import dbldatagen as dg
-from pyspark.sql import functions as F
+import re
 from pyspark.sql.types import *
 from datetime import date, datetime, timedelta
 import random
 
-# Realistic question templates for banner/ad analytics
+
+def generate_embedding_text(question: str) -> str:
+    """Generate embedding-optimized text by stripping {param} placeholders."""
+    stripped = re.sub(r'\{[^}]+\}', '', question)
+    stripped = re.sub(r'\s+', ' ', stripped).strip()
+    stripped = re.sub(r'\s+(for|in|by|the|this|from)\s*\??$', '?', stripped)
+    return stripped
+
+
 CERTIFIED_QUESTIONS = [
     "What is the total ad spend for {period}?",
     "How many impressions did the {campaign} campaign generate?",
@@ -124,22 +131,20 @@ for i, (q, sql, tmpl) in enumerate(zip(CERTIFIED_QUESTIONS, SQL_TEMPLATES, ANSWE
     params = []
     if ":period" in sql: params.append("period")
     if ":campaign" in sql: params.append("campaign")
-    
-    # Mix of statuses
-    if i < 14:
-        status = "certified"
-    elif i < 17:
-        status = "draft"
+
+    status = "certified"
+    certifier = random.choice(CERTIFIERS)
+    cert_date = datetime(2025, random.randint(1, 4), random.randint(1, 28))
+    # Last 2 entries (10%) have past review dates for staleness check testing
+    if i >= 18:
+        review_date = date.today() - timedelta(days=random.randint(30, 90))
     else:
-        status = "expired"
-    
-    certifier = random.choice(CERTIFIERS) if status == "certified" else None
-    cert_date = datetime(2025, random.randint(1,4), random.randint(1,28)) if status == "certified" else None
-    review_date = date.today() + timedelta(days=random.randint(90, 270)) if status != "expired" else date.today() - timedelta(days=random.randint(90, 365))
-    
+        review_date = date.today() + timedelta(days=random.randint(90, 270))
+
     corpus_rows.append({
         "id": f"QA-{i+1:04d}",
         "question": q,
+        "embedding_text": generate_embedding_text(q),
         "question_embedding": None,
         "parameterized_sql": sql,
         "answer_template": tmpl,
@@ -148,13 +153,14 @@ for i, (q, sql, tmpl) in enumerate(zip(CERTIFIED_QUESTIONS, SQL_TEMPLATES, ANSWE
         "certified_by": certifier,
         "certified_date": cert_date,
         "next_review_date": review_date,
-        "created_at": datetime(2025, 1, random.randint(1,28), random.randint(8,18)),
-        "updated_at": datetime(2025, random.randint(1,5), random.randint(1,28), random.randint(8,18)),
+        "created_at": datetime(2025, 1, random.randint(1, 28), random.randint(8, 18)),
+        "updated_at": datetime(2025, random.randint(1, 5), random.randint(1, 28), random.randint(8, 18)),
     })
 
 corpus_schema = StructType([
     StructField("id", StringType(), False),
     StructField("question", StringType(), False),
+    StructField("embedding_text", StringType(), False),
     StructField("question_embedding", ArrayType(FloatType()), True),
     StructField("parameterized_sql", StringType(), False),
     StructField("answer_template", StringType(), False),
@@ -168,10 +174,9 @@ corpus_schema = StructType([
 ])
 
 corpus_df = spark.createDataFrame(corpus_rows, schema=corpus_schema)
-# TRUNCATE + append to preserve CDF (required for Vector Search Delta Sync)
 spark.sql(f"TRUNCATE TABLE {catalog_name}.{schema_name}.certified_qa_corpus")
 corpus_df.write.mode("append").saveAsTable(f"{catalog_name}.{schema_name}.certified_qa_corpus")
-print(f"✓ Wrote {corpus_df.count()} rows to certified_qa_corpus")
+print(f"Wrote {corpus_df.count()} rows to certified_qa_corpus")
 
 # COMMAND ----------
 

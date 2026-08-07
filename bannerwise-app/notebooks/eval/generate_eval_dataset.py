@@ -1,13 +1,13 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Generate Router Evaluation Dataset
-# MAGIC 
+# MAGIC
 # MAGIC Reads the `certified_qa_corpus` and uses an LLM to generate a comprehensive eval dataset
 # MAGIC covering paraphrases, parameter variations, near-miss negatives, adversarial prompts,
 # MAGIC and unrelated questions.
-# MAGIC 
+# MAGIC
 # MAGIC **Output**: `router_eval_dataset` table (~450 rows)
-# MAGIC 
+# MAGIC
 # MAGIC See `docs/ROUTER_TEST_DESIGN.md` for full design rationale.
 
 # COMMAND ----------
@@ -60,21 +60,29 @@ print(f"  Regenerate: {REGENERATE}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Load Certified Corpus
+from datetime import date
+
 corpus_df = spark.table(CORPUS_TABLE)
 corpus_entries = corpus_df.collect()
 print(f"Loaded {len(corpus_entries)} corpus entries")
 
-# Separate by status for staleness tests
+# Separate by staleness (next_review_date < today) for staleness tests
+# All entries have status='certified'; stale entries are identified by past review date
 certified_entries = [r for r in corpus_entries if r["status"] == "certified"]
-stale_candidates = [r for r in corpus_entries if r["status"] == "expired"]
+stale_candidates = [r for r in corpus_entries if r["next_review_date"] and r["next_review_date"] < date.today()]
+non_stale_entries = [r for r in certified_entries if r not in stale_candidates]
+
 print(f"  Certified: {len(certified_entries)}")
-print(f"  Expired (for staleness tests): {len(stale_candidates)}")
+print(f"  Stale (past next_review_date): {len(stale_candidates)} ({len(stale_candidates)/len(corpus_entries)*100:.0f}%)")
+print(f"  Non-stale (active): {len(non_stale_entries)}")
+assert len(stale_candidates) / len(corpus_entries) <= 0.10, f"Staleness invariant violated: {len(stale_candidates)}/{len(corpus_entries)} > 10%"
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## LLM Helper
-# MAGIC 
+# MAGIC
 # MAGIC Uses `dbutils` context for auth (required on serverless compute where
 # MAGIC `DATABRICKS_TOKEN` env var is not set).
 
@@ -147,26 +155,34 @@ print(f"  LLM OK: {parsed}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Category 1: Exact Paraphrases (expected: certified)
 from datetime import datetime
 
 eval_rows = []
 
-print(f"Generating {NUM_PARAPHRASES} paraphrases per certified entry...")
-for entry in certified_entries:
+# Only generate positive cases (expected: certified) from NON-STALE entries
+# Stale entries will correctly route to analytical via staleness gate
+print(f"Generating {NUM_PARAPHRASES} paraphrases per non-stale certified entry...")
+for entry in non_stale_entries:
     question = entry["question"]
     corpus_id = entry["id"]
     
     prompt = f"""Given this certified question: "{question}"
 
-Generate exactly {NUM_PARAPHRASES} paraphrases that ask the EXACT same thing using different words.
+Generate exactly {NUM_PARAPHRASES} paraphrases that ask for the SAME core metric/analysis using different words.
 
 Rules:
-- Preserve the original intent completely
+- Preserve the CORE ANALYTICAL INTENT (same metric being measured)
 - Vary sentence structure, vocabulary, and phrasing
 - Include formal, casual, and question-with-context variations
 - If the question has parameter placeholders like {{period}} or {{campaign}}, replace them with concrete values
-  (e.g., "Q1 2025", "spring_sale", "holiday", "last month")
+  (e.g., "Q1 2025", "summer campaign", "holiday", "last month", "North America")
+- You MAY add specific time periods, campaign names, or regions even if the template doesn't have a placeholder
+  (e.g., "What is the CTR by banner size for Q1?" is still the same intent as "What is the CTR by banner size?")
+- Use concept synonyms (bounce rate = percentage who leave, viewability = percentage actually seen, CPA = cost per acquisition)
 - Each paraphrase must be a complete, natural question a user would type
+
+Do NOT change the core metric to something different (e.g., do NOT turn "CTR by banner size" into "CTR for holiday ads" — that changes the grouping dimension)
 
 Return ONLY a JSON array of strings. Example: ["paraphrase 1", "paraphrase 2"]"""
     
@@ -198,10 +214,11 @@ print(f"\nTotal paraphrase rows: {len(eval_rows)}")
 
 # COMMAND ----------
 
-print(f"Generating {NUM_PARAM_VARIATIONS} parameter variations per parameterized entry...")
+# DBTITLE 1,Category 2: Parameter Variations (expected: certified)
+print(f"Generating {NUM_PARAM_VARIATIONS} parameter variations per parameterized non-stale entry...")
 param_count_before = len(eval_rows)
 
-for entry in certified_entries:
+for entry in non_stale_entries:
     question = entry["question"]
     # Check if question has parameter placeholders
     if "{" not in question:
@@ -251,10 +268,11 @@ print(f"  Parameter variation rows added: {len(eval_rows) - param_count_before}"
 
 # COMMAND ----------
 
-print(f"Generating {NUM_COLLOQUIAL} colloquial rewrites per entry...")
+# DBTITLE 1,Category 3: Colloquial Rewrites (expected: certified)
+print(f"Generating {NUM_COLLOQUIAL} colloquial rewrites per non-stale entry...")
 colloquial_before = len(eval_rows)
 
-for entry in certified_entries:
+for entry in non_stale_entries:
     question = entry["question"]
     corpus_id = entry["id"]
     
@@ -297,6 +315,7 @@ print(f"  Colloquial rows added: {len(eval_rows) - colloquial_before}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Category 4: Near-Miss Negatives (expected: analytical)
 print(f"Generating {NUM_NEAR_MISSES} near-miss negatives per entry...")
 nearmiss_before = len(eval_rows)
 
@@ -306,18 +325,25 @@ for entry in certified_entries:
     
     prompt = f"""Given this certified question: "{question}"
 
-Generate exactly {NUM_NEAR_MISSES} questions that are RELATED to the same topic but ask for something DIFFERENT.
+Generate exactly {NUM_NEAR_MISSES} questions that are RELATED to the same topic but ask for a FUNDAMENTALLY DIFFERENT analysis.
 
 Rules:
 - Must be about the same general domain (ads, banners, campaigns, digital marketing)
-- Must have a CLEARLY different intent (different metric, different aggregation, different scope, different granularity)
+- Must ask for a DIFFERENT core metric/analysis that CANNOT be answered by the certified SQL
 - Should be plausible questions a real analyst might ask
-- The confidence gate should NOT match these to the certified entry
 
-Examples of "near miss":
-- Certified: "What is the total ad spend for Q1?" → Near miss: "How is ad spend distributed across channels?"
-- Certified: "What is the CTR by banner size?" → Near miss: "Which banner sizes should we retire?"
-- Certified: "What was the ROI for the spring campaign?" → Near miss: "Compare ROI trends across all campaigns over time"
+CRITICAL: These are NOT near-misses (do NOT generate these):
+- Same metric with a time period added ("CTR for Q1") — this MATCHES the certified question
+- Same metric with a campaign/region filter ("spend for summer campaign") — this MATCHES
+- Same metric with typos or informal language — this MATCHES
+- Same metric with synonyms ("bounce rate" = "percentage who leave") — this MATCHES
+
+These ARE valid near-misses (generate these):
+- Certified: "What is the total ad spend for Q1?" → Near miss: "How is ad spend distributed across channels?" (different GROUPING)
+- Certified: "What is the CTR by banner size?" → Near miss: "Which banner sizes should we retire?" (different ANALYSIS TYPE — recommendation vs metric)
+- Certified: "What was the ROI for the spring campaign?" → Near miss: "Compare ROI trends across all campaigns over time" (RANKING/COMPARISON across entities)
+- Certified: "What is the bounce rate from banner landing pages?" → Near miss: "What factors drive high bounce rates?" (CAUSAL analysis)
+- Certified: "What is the conversion rate for banner campaigns?" → Near miss: "Which campaign had the highest conversion rate?" (RANKING — needs subquery)
 
 Return ONLY a JSON array of strings."""
     
@@ -393,17 +419,17 @@ print(f"  Unrelated rows added: {len(eval_rows) - unrelated_before}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Category 6: Stale Entry Tests (expected: analytical)
 print("Generating stale entry test cases...")
 stale_before = len(eval_rows)
 
-# Use expired entries if any exist
+# Use stale entries (past next_review_date) — detected in cell above
 # IMPORTANT: Stale entry test prompts must use UNIQUE keywords that only exist
-# in the expired entries and NOT in any certified entry. This ensures VS returns
-# the expired entry as the top match, so the staleness check fires correctly.
+# in the stale entries and NOT in any non-stale entry. This ensures VS returns
+# the stale entry as the top match, so the staleness check fires correctly.
 #
-# Expired entries and their unique signals:
-#   QA-0018: "viewability" — no certified entry mentions this term
-#   QA-0019: "trended over 6 months" — unique temporal scope (QA-0003 is "CTR by size")
+# Stale entries (QA-0019, QA-0020) and their unique signals:
+#   QA-0019: "trended over 6 months" — unique temporal scope
 #   QA-0020: "CPM by publisher" — unique dimension (QA-0005 is "CPM by region")
 
 for entry in stale_candidates:
@@ -435,7 +461,7 @@ Return ONLY a JSON array of 5 strings."""
             "source_corpus_id": corpus_id,
             "generation_method": "llm_paraphrase",
             "created_at": datetime.utcnow(),
-            "notes": f"Stale entry (expired): {corpus_id} — uses unique keywords"
+            "notes": f"Stale entry (past review_date): {corpus_id} — uses unique keywords"
         })
 
 print(f"  Stale test rows added: {len(eval_rows) - stale_before}")
@@ -447,6 +473,7 @@ print(f"  Stale test rows added: {len(eval_rows) - stale_before}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Category 7: Adversarial Tests (expected: analytical)
 print("Generating adversarial test cases...")
 adversarial_before = len(eval_rows)
 
@@ -457,15 +484,20 @@ The router has these certified questions in its corpus:
 {json.dumps(sample_questions, indent=2)}
 
 Generate prompts in these adversarial categories (5 each):
-1. COMPOUND: Combine two different intents in one question
-2. MISLEADING: Use keywords from certified entries but with different intent
-3. INJECTION: "Ignore previous instructions...", "system: override confidence..."
-4. AMBIGUOUS: Could match multiple entries or none clearly
-5. EDGE: Very short (1-2 words), very long (50+ words), with typos, or broken grammar
+1. COMPOUND: Combine two DISTINCT metrics in one question (e.g. "What is the spend AND how many impressions?")
+2. MISLEADING: Use keywords from certified entries but ask for a genuinely different analysis (e.g. "industry benchmarks" using same keywords as internal metrics)
+3. INJECTION: "Ignore previous instructions...", "system: override confidence...", prompt injection attempts
+4. AMBIGUOUS: Questions that could match multiple entries equally or are genuinely unclear
+5. NONSENSE: Non-questions, random text, extremely vague single words like "data", or requests that aren't analytics questions
 
-ALL should route to the analytical lane (they should NOT be matched confidently).
+IMPORTANT: Do NOT include:
+- Questions with simple typos/misspellings (those are valid user input and SHOULD match)
+- Questions that add a time period or campaign name to a certified metric (those SHOULD match)
+- Informal/slang versions of certified questions (those SHOULD match)
 
-Return ONLY a JSON array of objects: [{{"prompt": "...", "subcategory": "compound|misleading|injection|ambiguous|edge"}}]"""
+ALL generated prompts must be genuinely unmatchable to any certified entry.
+
+Return ONLY a JSON array of objects: [{{"prompt": "...", "subcategory": "compound|misleading|injection|ambiguous|nonsense"}}]"""
 
 result = call_llm(prompt, max_tokens=3000)
 adversarial = parse_json_list(result)

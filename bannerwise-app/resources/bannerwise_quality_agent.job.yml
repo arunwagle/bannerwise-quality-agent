@@ -17,18 +17,36 @@ resources:
           default: ${var.schema_name}
 
       tasks:
-        - task_key: create_schema_and_tables
-          description: 'Create Delta tables for corpus, query history, and review queue (DDL only, no data)'
+        - task_key: reset_vector_index
+          description: 'Ensures VS index is reset for clean recreation by vector_index_job'
+          notebook_task:
+            notebook_path: ../notebooks/vs/cleanup_vector_index.py
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+
+        - task_key: create_system_tables
+          description: 'Initializes system tables (corpus with CDF, draft, history, review queue)'
           notebook_task:
             notebook_path: ../notebooks/data/create_tables.py
             base_parameters:
               catalog_name: '{{job.parameters.catalog_name}}'
               schema_name: '{{job.parameters.schema_name}}'
 
-        - task_key: create_analytics_tables
-          description: 'Create analytics tables (ad_metrics, campaign_metrics, etc.) used by certified SQL templates'
+        - task_key: seed_corpus
+          description: 'Seeds certified QA corpus with 20 approved entries (embedding_text auto-generated)'
           depends_on:
-            - task_key: create_schema_and_tables
+            - task_key: create_system_tables
+          notebook_task:
+            notebook_path: ../tests/notebooks/setup_test_data.py
+            base_parameters:
+              catalog_name: '{{job.parameters.catalog_name}}'
+              schema_name: '{{job.parameters.schema_name}}'
+
+        - task_key: create_app_tables
+          description: 'Creates and populates 9 analytics tables (ad_metrics, campaign_metrics, etc.)'
+          depends_on:
+            - task_key: create_system_tables
           notebook_task:
             notebook_path: ../notebooks/data/create_synthetic_data.py
             base_parameters:
@@ -108,11 +126,12 @@ resources:
         enabled: true
 
     # ─────────────────────────────────────────────────────────────
-    # Vector Index Job — Populates corpus and creates VS index
+    # Vector Index Job — Creates VS Delta Sync index on embedding_text
+    # Prerequisite: setup_job must have run (corpus table populated)
     # ─────────────────────────────────────────────────────────────
     vector_index_job:
       name: 'bannerwise-quality-agent-vector-index'
-      description: 'Populates certified QA corpus and creates the Delta Sync Vector Search index'
+      description: 'Creates the Delta Sync Vector Search index on certified_qa_corpus (embedding_text column)'
       tags:
         project: bannerwise-quality-agent
         purpose: vector-index-setup
@@ -124,18 +143,8 @@ resources:
           default: ${var.schema_name}
 
       tasks:
-        - task_key: setup_certified_corpus
-          description: 'Populate certified QA corpus table with approved Q&A entries'
-          notebook_task:
-            notebook_path: ../tests/notebooks/setup_test_data.py
-            base_parameters:
-              catalog_name: '{{job.parameters.catalog_name}}'
-              schema_name: '{{job.parameters.schema_name}}'
-
         - task_key: create_vector_search_index
-          description: 'Create Delta Sync VS index on certified_qa_corpus'
-          depends_on:
-            - task_key: setup_certified_corpus
+          description: 'Create or sync Delta Sync VS index on certified_qa_corpus.embedding_text'
           notebook_task:
             notebook_path: ../notebooks/vs/create_vector_search_index.py
             base_parameters:
@@ -357,67 +366,4 @@ resources:
       queue:
         enabled: true
 
-    # ─────────────────────────────────────────────────────────────
-    # Cleanup Job — Resets environment to pre-deploy state
-    # ─────────────────────────────────────────────────────────────
-    cleanup_job:
-      name: 'bannerwise-quality-agent-cleanup'
-      description: 'Resets environment by removing deployed resources (VS index, serving endpoint, model)'
-      tags:
-        project: bannerwise-quality-agent
-        purpose: cleanup
-
-      parameters:
-        - name: catalog_name
-          default: ${var.catalog_name}
-        - name: schema_name
-          default: ${var.schema_name}
-        - name: vs_endpoint_name
-          default: ${resources.vector_search_endpoints.bannerwise_vs_endpoint.id}
-        - name: serving_endpoint_name
-          default: ${var.serving_endpoint_name}
-        - name: model_name
-          default: ${var.model_name}
-
-      tasks:
-        - task_key: cleanup_vector_index
-          description: 'Remove the Delta Sync Vector Search index'
-          notebook_task:
-            notebook_path: ../notebooks/vs/cleanup_vector_index.py
-            base_parameters:
-              catalog_name: '{{job.parameters.catalog_name}}'
-              schema_name: '{{job.parameters.schema_name}}'
-              vs_endpoint_name: '{{job.parameters.vs_endpoint_name}}'
-
-        - task_key: cleanup_serving_endpoint
-          description: 'Remove the router model serving endpoint'
-          notebook_task:
-            notebook_path: ../notebooks/agent/cleanup_serving_endpoint.py
-            base_parameters:
-              serving_endpoint_name: '{{job.parameters.serving_endpoint_name}}'
-
-        - task_key: cleanup_registered_model
-          description: 'Remove the registered model from Unity Catalog'
-          depends_on:
-            - task_key: cleanup_serving_endpoint
-          notebook_task:
-            notebook_path: ../notebooks/agent/cleanup_registered_model.py
-            base_parameters:
-              catalog_name: '{{job.parameters.catalog_name}}'
-              schema_name: '{{job.parameters.schema_name}}'
-              model_name: '{{job.parameters.model_name}}'
-
-        - task_key: cleanup_schema
-          description: 'Drop schema and all tables within it'
-          depends_on:
-            - task_key: cleanup_vector_index
-            - task_key: cleanup_registered_model
-          notebook_task:
-            notebook_path: ../notebooks/data/cleanup_schema.py
-            base_parameters:
-              catalog_name: '{{job.parameters.catalog_name}}'
-              schema_name: '{{job.parameters.schema_name}}'
-
-      queue:
-        enabled: true
 
