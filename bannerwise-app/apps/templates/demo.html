@@ -134,6 +134,22 @@
             </div>
             <div class="demo-pair">
                 <div class="demo-pair-header">
+                    <span class="demo-pair-label">Corpus: QA-0007 — Ad network performance (subset metric)</span>
+                    <button class="btn btn-primary btn-sm" onclick="runDemoPair(this)">Run Both &amp; Compare</button>
+                </div>
+                <div class="demo-pair-cards">
+                    <div class="demo-card" data-query="How does performance compare across ad networks?">
+                        <div class="demo-query">How does performance compare across ad networks?</div>
+                        <div class="demo-result hidden"></div>
+                    </div>
+                    <div class="demo-card" data-query="Compare CTR across all ad networks">
+                        <div class="demo-query">Compare CTR across all ad networks</div>
+                        <div class="demo-result hidden"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="demo-pair">
+                <div class="demo-pair-header">
                     <span class="demo-pair-label">Corpus: QA-0008 — Channel acquisition cost</span>
                     <button class="btn btn-primary btn-sm" onclick="runDemoPair(this)">Run Both &amp; Compare</button>
                 </div>
@@ -187,11 +203,6 @@
             <div class="demo-card">
                 <div class="demo-query">What is the revenue by channel for Q2 2025?</div>
                 <button class="btn btn-primary btn-sm" onclick="runDemoSingle(this, 'What is the revenue by channel for Q2 2025?')">Run</button>
-                <div class="demo-result hidden"></div>
-            </div>
-            <div class="demo-card">
-                <div class="demo-query">Compare CTR across all ad networks</div>
-                <button class="btn btn-primary btn-sm" onclick="runDemoSingle(this, 'Compare CTR across all ad networks')">Run</button>
                 <div class="demo-result hidden"></div>
             </div>
             <div class="demo-card">
