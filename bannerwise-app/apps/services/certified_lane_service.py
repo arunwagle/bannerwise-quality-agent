@@ -88,14 +88,27 @@ The certified question template is: "{matched_question}"
 The parameters to extract are: [{param_list}]
 The user's actual question is: "{prompt}"
 
-For each parameter, identify the concrete value the user provided.
-Return ONLY a JSON object mapping parameter names to their values.
-If a parameter cannot be determined, use "unknown".
+IMPORTANT: The parameter value must REPLACE the {{placeholder}} in the template so that the
+resulting sentence matches what the user said. Do NOT include words that already exist in the
+template text around the placeholder.
 
-Example:
+Example 1:
 Template: "What is the total ad spend for {{period}}?"
 User: "What is the total ad spend for Q1 2025?"
 Output: {{"period": "Q1 2025"}}
+(Substituting: "...for Q1 2025?" ✓)
+
+Example 2:
+Template: "What was the ROI for the {{campaign}} campaign?"
+User: "What was the ROI for the summer campaign?"
+Output: {{"campaign": "summer"}}
+(Substituting: "...for the summer campaign?" ✓)
+WRONG: {{"campaign": "summer campaign"}} — would produce "...for the summer campaign campaign?" ✗
+
+Example 3:
+Template: "How many impressions did the {{campaign}} campaign generate?"
+User: "How many impressions did the holiday campaign generate?"
+Output: {{"campaign": "holiday"}}
 
 Return ONLY the JSON object, no explanation."""
 
