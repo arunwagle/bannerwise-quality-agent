@@ -299,8 +299,17 @@ def _format_answer(answer_template: str, params: dict, sql_results: list) -> str
 
     import string
 
-    # Merge params + first row of results into a single context dict
+    # Build results_table (markdown table from ALL rows) for templates that reference it
+    columns = list(sql_results[0].keys())
+    table_lines = ["| " + " | ".join(columns) + " |"]
+    table_lines.append("| " + " | ".join(["---"] * len(columns)) + " |")
+    for row in sql_results[:20]:  # Cap at 20 rows
+        table_lines.append("| " + " | ".join(str(row.get(c, "")) for c in columns) + " |")
+    results_table = "\n".join(table_lines)
+
+    # Merge params + first row + results_table into a single context dict
     context = dict(params)
+    context["results_table"] = results_table
     first_row = sql_results[0]
     has_null_values = False
     for col, val in first_row.items():
