@@ -217,9 +217,9 @@ Rules for MATCH — answer MATCH when ALL are true:
 3. Any additional specificity (time periods, campaign names, regions, channels) is acceptable
 
 Examples of NO_MATCH:
-- Template: "What was the ROI for the {campaign} campaign?" <- "Which campaign had the highest ROI?" (user wants RANKING across all campaigns; template looks up ONE specific campaign)
-- Template: "What was the ROI for the {campaign} campaign?" <- "Which campaign had the highest ROI this year?" (same — wants top/best/highest across all; template is per-entity lookup)
-- Template: "What is the total ad spend for {period}?" <- "Which quarter had the highest ad spend?" (ranking across all periods vs lookup for one period)
+- Template: "What was the ROI for the {{campaign}} campaign?" <- "Which campaign had the highest ROI?" (user wants RANKING across all campaigns; template looks up ONE specific campaign)
+- Template: "What was the ROI for the {{campaign}} campaign?" <- "Which campaign had the highest ROI this year?" (same — wants top/best/highest across all; template is per-entity lookup)
+- Template: "What is the total ad spend for {{period}}?" <- "Which quarter had the highest ad spend?" (ranking across all periods vs lookup for one period)
 - Template: "What is the cost per acquisition by channel?" <- "Show me channel performance trends over time" (different metric: trends vs CPA)
 - Template: "What is the effective CPM by publisher?" <- "Compare CPM and CTR across all publishers" (compound: two metrics)
 

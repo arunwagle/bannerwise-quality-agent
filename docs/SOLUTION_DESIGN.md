@@ -15,22 +15,33 @@ The Router Agent is an MLflow PyFunc model served via Databricks Model Serving. 
 
 ---
 
-### Step 1 — Vector Search Retrieval
+### Step 1 — Vector Search Retrieval (HYBRID)
 
 **Current Behavior:**
 
-The user's prompt is embedded using `databricks-bge-large-en` and compared against the `certified_qa_index` (cosine similarity). The top `k=3` candidates are returned with their similarity scores.
+The user's prompt is searched against the `certified_qa_index` using **HYBRID** search (vector embedding + BM25 keyword matching combined via Reciprocal Rank Fusion). The top `k=3` candidates are returned with their fused similarity scores.
 
 | Aspect | Detail |
 | --- | --- |
 | Embedding Model | `databricks-bge-large-en` |
-| Index | `aw_serverless_stable_catalog.bannerhealth.certified_qa_index` |
+| Index | `certified_qa_index` (in project catalog/schema) |
 | Embedding Source Column | `embedding_text` (NOT `question`) |
+| Query Type | **HYBRID** (vector + BM25 via RRF) |
 | Sync Mode | Delta Sync (TRIGGERED — manually synced on certify action) |
 | Top-K | 3 candidates |
-| Similarity | Cosine |
-| Fields Returned | `corpus_id`, `question`, `embedding_text`, `score`, `status`, `parameterized_sql`, `answer_template`, `parameters` |
+| Similarity | Cosine (vector component) + BM25 (keyword component) |
+| Filters | `{"status NOT": "expired"}` — excludes expired entries at query time |
+| Fields Returned | `id`, `question`, `status`, `next_review_date`, `score` |
 | CDF Requirement | Source table must have Change Data Feed enabled for Delta Sync |
+
+**Why HYBRID over ANN?**
+
+Pure ANN (vector-only) suffered from **parameter dilution**: when a user asks "What is the total ad spend for Q1 2025?", the tokens "for Q1 2025" dilute the embedding vector, reducing cosine similarity against the stripped `embedding_text` "What is the total ad spend?" to ~0.73. HYBRID search adds BM25 keyword matching which catches the shared terms directly, pushing scores to **1.0** for parameterized queries.
+
+| Query | ANN Score | HYBRID Score |
+| --- | --- | --- |
+| "What is the total ad spend for Q1 2025?" | 0.73 | **1.0** |
+| "What was the ROI for the summer campaign?" | ~0.75 | **1.0** |
 
 **Dual-Column Embedding Strategy:**
 
@@ -56,8 +67,8 @@ The `generate_embedding_text()` function strips `{param}` placeholders and remov
 - That's why Step 2 (LLM Judge) uses the original `question` (with `{param}` placeholders) — the LLM understands parameterization
 
 **Possible Enhancements:**
-- **Hybrid search**: Combine vector similarity with keyword/BM25 matching for better recall on short queries
-- **Pre-filtering by status**: Only retrieve `status='certified'` entries (skip expired/draft)
+- ~~**Hybrid search**~~: ✅ Implemented — HYBRID query_type combines vector + BM25 via RRF
+- ~~**Pre-filtering by status**~~: ✅ Implemented — `filters_json='{"status NOT": "expired"}'` applied at query time
 - **Dynamic top-k**: Increase k for ambiguous queries, decrease for high-confidence single matches
 - **Embedding fine-tuning**: Train a domain-specific embedding model on Banner Health's Q&A pairs
 - **Multi-index retrieval**: Separate indexes for different question categories (spend, performance, attribution)
@@ -65,71 +76,93 @@ The `generate_embedding_text()` function strips `{param}` placeholders and remov
 
 ---
 
-### Step 2 — LLM Judge
+### Step 2 — LLM Judge (Binary Intent Match)
 
 **Current Behavior:**
 
-The LLM Judge receives the user's question and the top corpus candidate, then evaluates whether they have the **same semantic intent**. It outputs a binary **YES/NO** verdict.
+The LLM Judge receives the user's question and each top-k corpus candidate (evaluated sequentially — first MATCH wins). It applies a structured prompt with explicit MATCH/NO_MATCH rules and examples.
 
 | Aspect | Detail |
 | --- | --- |
 | Model | `databricks-meta-llama-3-3-70b-instruct` |
-| Input | User prompt + best corpus candidate question |
-| Output | Binary: `YES` (same intent) or `NO` (different intent) |
-| Prompt Design | "Does the user's question have the same intent as this certified question? Consider that parameters (dates, campaign names) may differ but the underlying analytical question is the same." |
+| Input | User prompt + candidate corpus question (with `{param}` placeholders) |
+| Output | Binary: `MATCH` (same intent) or `NO_MATCH` (different intent) |
+| Evaluation | Sequential — evaluates up to 3 candidates, first MATCH wins |
+| Prompt Design | Structured rules with explicit MATCH and NO_MATCH examples |
 
 **How it works:**
-- The judge is asked a simple equivalence question
-- `YES` means: the user is asking the same thing as the certified question, possibly with different parameters
-- `NO` means: the user is asking something fundamentally different
-- This maps to confidence: YES → 1.0, NO → 0.0
+- Each VS candidate is evaluated sequentially (not just the best)
+- `MATCH` → confidence 1.0 → passes gate → Certified Lane
+- `NO_MATCH` → confidence 0.0 → fails gate → Analytical Lane
+- First MATCH wins; if no candidate matches, falls through to analytical
+
+**Key Judge Rules:**
+
+MATCH when ALL true:
+1. User asks for exactly ONE metric/analysis (not compound)
+2. That metric is the SAME as what the template measures (paraphrases, synonyms, abbreviations, typos all count)
+3. Additional specificity (time periods, campaign names, regions) is acceptable — fills the `{param}` placeholder
+
+NO_MATCH if ANY apply:
+1. **COMPOUND**: Two or more distinct metrics (e.g., "total spend AND impressions")
+2. **DIFFERENT METRIC**: Core analysis is fundamentally different
+3. **RANKING/AGGREGATION**: User wants to find best/worst/highest/lowest/top across ALL values — template asks about ONE specific named value (e.g., "which campaign had the highest ROI?" ≠ "ROI for {campaign}")
+4. **DIFFERENT SUBJECT**: Completely different domain or entity
+5. **ADVERSARIAL**: Injection attempts, contradictions, system-override language
 
 **Examples:**
 
 | User Question | Corpus Match | Judge | Why |
 | --- | --- | --- | --- |
-| "What is the total ad spend for Q1 2025?" | "What is the total ad spend for {period}?" | YES | Same intent, different parameter |
-| "Which campaign had the highest ROI?" | "What was the ROI for the {campaign} campaign?" | NO | User wants ranking across ALL campaigns; corpus asks about ONE specific campaign |
-| "Compare CPM across all regions" | "Which regions have the highest CPM?" | YES | Same analytical intent, different phrasing |
+| "What is the total ad spend for Q1 2025?" | "What is the total ad spend for {period}?" | MATCH | Same intent, parameter fill |
+| "what's CPA by channel?" | "What is the cost per acquisition by channel?" | MATCH | Abbreviation + same metric |
+| "What is teh click throuh rate by bannr size?" | "What is the click-through rate by banner size?" | MATCH | Typos, same intent |
+| "Which campaign had the highest ROI?" | "What was the ROI for the {campaign} campaign?" | NO_MATCH | User wants RANKING across ALL campaigns; template looks up ONE |
+| "Which quarter had the highest ad spend?" | "What is the total ad spend for {period}?" | NO_MATCH | Ranking across all periods vs lookup for one period |
+| "Show me campaign performance trends over time" | "What was the ROI for the {campaign} campaign?" | NO_MATCH | Different metric (multi-campaign trends vs single ROI) |
+| "Compare CPM and CTR across publishers" | "What is the effective CPM by publisher?" | NO_MATCH | Compound: two distinct metrics |
+
+**Why this works:** The judge catches cases where VS gives high similarity (97%+) but intent differs. Example: "Show me campaign performance trends over time" gets 97.7% VS similarity against "ROI for {campaign}" (both about "campaigns"), but the judge correctly identifies different analytical intent.
 
 **Possible Enhancements:**
-- **Graduated confidence scoring**: Instead of binary YES/NO, have the judge output a confidence score (0–100). This creates a meaningful range:
-  - 85–100: High confidence → Certified Lane
-  - 50–84: Medium confidence → Certified Lane with "verify" flag
-  - 25–49: Low confidence → Analytical Lane with "similar certified answer available" note
-  - 0–24: No match → Analytical Lane
-- **Multi-candidate evaluation**: Judge all top-k candidates (not just the best) and pick the highest-scoring one
+- **Graduated confidence scoring**: Instead of binary, output a score (0–100) for graduated routing
+- **Multi-candidate evaluation**: ✅ Implemented — judges up to 3 candidates sequentially
 - **Chain-of-thought reasoning**: Ask the judge to explain reasoning before concluding
-- **Few-shot examples**: Include labeled examples in the judge prompt for better calibration
-- **Judge ensemble**: Use 2 different LLMs as judges and require agreement
+- **Few-shot examples**: ✅ Implemented — explicit MATCH and NO_MATCH examples in prompt
+- **Judge ensemble**: Use 2 different LLMs and require agreement
 - **Parameter-aware judging**: Explicitly tell the judge which parameters are expected
 
 ---
 
-### Step 3 — Confidence Gate
+### Step 3 — Confidence Gate + Staleness Check
 
 **Current Behavior:**
 
-The gate is a simple threshold check. Since the judge outputs binary (0.0 or 1.0), the threshold of 0.5 is merely a separator — any value between 0.01 and 0.99 would produce identical behavior.
+The gate combines a threshold check with a staleness check. Since the judge outputs binary (0.0 or 1.0), the threshold is merely a separator. However, **stale entries** (past `next_review_date`) are penalized below threshold regardless of judge verdict.
 
 | Aspect | Detail |
 | --- | --- |
-| Threshold | `0.5` (configurable via `CONFIDENCE_THRESHOLD`) |
-| Judge YES → confidence 1.0 | Passes gate → **Certified Lane** |
-| Judge NO → confidence 0.0 | Fails gate → **Analytical Lane** |
-| Effect of threshold | With binary judge, threshold is just a separator. No query ever scores between 0 and 1. |
+| Threshold | Configurable via `CONFIDENCE_THRESHOLD` (set in `databricks.yml` variables) |
+| Judge MATCH → confidence 1.0 | Passes gate → **Certified Lane** (if not stale) |
+| Judge NO_MATCH → confidence 0.0 | Fails gate → **Analytical Lane** |
+| Staleness check | If `next_review_date < today()`: confidence clamped to `threshold - 0.01` → fails gate |
+| Status check | Entry must have `status = 'certified'` to pass |
+
+**Routing Decision Logic:**
+```
+if confidence >= threshold AND status == 'certified' AND not stale:
+    → Certified Lane
+else:
+    → Analytical Lane (with reason explaining why)
+```
 
 **Why this works for a demo:**
-The binary approach is simple, predictable, and easy to explain. The quality control lives entirely in the judge prompt quality, not in threshold tuning.
+The binary approach is simple, predictable, and easy to explain. The quality control lives entirely in the judge prompt quality, not in threshold tuning. The staleness gate ensures expired entries don't serve stale answers.
 
 **Possible Enhancements:**
-- **Graduated thresholds** (requires graduated judge above):
-  - `threshold_certified = 0.85` — high bar for certified answers
-  - `threshold_suggest = 0.50` — medium bar for "similar certified answer available"
-  - Below 0.50 — pure analytical lane
+- **Graduated thresholds** (requires graduated judge above)
 - **Dynamic thresholds**: Adjust based on corpus coverage per domain
-- **Shrink factor**: A multiplier on the judge score to account for over-confidence (`final_score = raw_score * shrink_factor`). Currently 1.0 (no shrink).
-- **Multi-gate routing**: Add a third "human-in-the-loop" lane for borderline cases (50–85%)
+- **Multi-gate routing**: Add a third "human-in-the-loop" lane for borderline cases
 
 ---
 
@@ -140,7 +173,50 @@ When the gate says YES, the certified lane executes the pre-approved SQL with ex
 <!-- Diagram: docs/diagrams/02_certified_lane_flow.drawio -->
 ![Certified Lane Flow](diagrams/02_certified_lane_flow.drawio.png)
 
-**LLM Endpoint**: `databricks-meta-llama-3-3-70b-instruct` (for parameter extraction and answer formatting)
+**LLM Endpoint**: Configurable via `LLM_ENDPOINT` env var (for parameter extraction)
+
+### Certified Lane Pipeline Steps
+
+```
+User prompt → Parameter Extraction (LLM) → Parameter Validation (DB check)
+    → SQL Binding → SQL Execution → Answer Formatting → Response
+```
+
+### Parameter Extraction (Substitution-Based)
+
+The LLM extracts parameter values using a **substitution principle**: the extracted value must REPLACE the `{placeholder}` such that the resulting sentence matches the user's question.
+
+Example:
+- Template: "What was the ROI for the {campaign} campaign?"
+- User: "What was the ROI for the summer campaign?"
+- Correct: `campaign = "summer"` → "...the **summer** campaign?" ✓
+- Wrong: `campaign = "summer campaign"` → "...the summer campaign campaign?" ✗
+
+This prevents the common failure where the LLM includes literal template words in the extracted value.
+
+### Parameter Validation Layer
+
+After extraction, each parameter is validated against actual database values:
+
+1. Parse SQL for `WHERE column = :param` patterns
+2. Query `SELECT DISTINCT column FROM table` to get valid values
+3. If value exists (case-insensitive) → auto-correct case and proceed
+4. If close match found (substring containment) → suggest: "Did you mean **summer**?"
+5. If no match → return: "No 'Black Friday' found in `campaign_name`. Available: summer, holiday, spring_sale, ..."
+
+This prevents NULL results and provides actionable feedback when users ask about data that doesn't exist.
+
+### Answer Formatting
+
+Templates can reference:
+- **Scalar values**: `{roi:.2f}`, `{total_spend:,.0f}` — from first row of SQL results
+- **Parameters**: `{campaign}`, `{period}` — from extracted values
+- **`{results_table}`**: Auto-generated markdown table from ALL rows (capped at 20)
+
+Safety layers:
+- NULL values default to `0` (safe for format specs like `:.2f`) with a note appended
+- Missing keys filled with "N/A" on retry
+- Final fallback: readable key-value format from raw results
 
 ---
 
@@ -408,7 +484,7 @@ The app runs as a Databricks App with an automatically provisioned service princ
 | CAN_USE | VS endpoint `bannerwise-vs-endpoint` | App SP | PATCH `/permissions/vector-search-endpoints/{id}` |
 | CAN_QUERY | Serving endpoint `bannerwise-quality-router` | App SP | PATCH `/permissions/serving-endpoints/{id}` |
 | CAN_QUERY | LLM endpoint `databricks-meta-llama-3-3-70b-instruct` | App SP | PATCH `/permissions/serving-endpoints/{id}` |
-| CAN_RUN | Genie Space `01f19026d0e61c88b840ce168a9be672` | App SP | PATCH `/permissions/genie/{id}` |
+| CAN_RUN | Genie Space (ID from `app.yaml`) | App SP | PATCH `/permissions/genie/{id}` |
 | SELECT | VS Index `certified_qa_index` | Model Serving | SQL GRANT TO `system-model-serving` |
 | CAN_USE | VS endpoint `bannerwise-vs-endpoint` | Model Serving | PATCH (via `users` group) |
 
@@ -507,17 +583,22 @@ Promotion flow: train → eval passes thresholds → register → set alias `cha
 
 ## 9. Configuration Parameters
 
-| Parameter | Default | Description |
+All configuration is managed via **DABs variables** in `databricks.yml` (no hardcoded IDs in source code). The app reads values from environment variables set in `app.yaml`.
+
+| Parameter | Source | Description |
 | --- | --- | --- |
-| `CONFIDENCE_THRESHOLD` | `0.5` | Gate threshold (binary judge: 1.0 passes, 0.0 fails) |
-| `VS_TOP_K` | `3` | Number of candidates from Vector Search |
-| `SHRINK_FACTOR` | `1.0` | Multiplier on judge score (1.0 = no adjustment) |
-| `JUDGE_MODEL` | `databricks-meta-llama-3-3-70b-instruct` | LLM for semantic equivalence |
-| `GENIE_SPACE_ID` | `01f19026d0e61c88b840ce168a9be672` | Genie Space for analytical lane |
-| `GENIE_TIMEOUT_SEC` | `60` | Max wait for Genie response |
-| `SQL_WAREHOUSE_ID` | `2d8e531640ffa469` | Warehouse for SQL execution |
-| `SERVING_ENDPOINT_NAME` | `bannerwise-quality-router` | Model Serving endpoint |
-| `LLM_ENDPOINT` | `databricks-meta-llama-3-3-70b-instruct` | LLM for param extraction + formatting |
+| `CONFIDENCE_THRESHOLD` | `databricks.yml` variable | Gate threshold (binary judge: 1.0 passes, 0.0 fails) |
+| `VS_TOP_K` | Job parameter | Number of candidates from Vector Search |
+| `SHRINK_FACTOR` | `databricks.yml` variable | Multiplier on judge score (1.0 = no adjustment) |
+| `JUDGE_MODEL` | `databricks.yml` variable | LLM for semantic equivalence judging |
+| `GENIE_SPACE_ID` | `app.yaml` env | Genie Space for analytical lane (auto-set by DABs deploy) |
+| `GENIE_TIMEOUT_SEC` | `app.yaml` env | Max wait for Genie response |
+| `SQL_WAREHOUSE_ID` | `databricks.yml` variable | Warehouse for SQL execution |
+| `SERVING_ENDPOINT_NAME` | `databricks.yml` variable | Model Serving endpoint name |
+| `LLM_ENDPOINT` | `app.yaml` env | LLM for param extraction + answer formatting |
+| `API_MODE` | `app.yaml` env | `live` (serving endpoint) or `mock` (demo mode) |
+
+**Note:** Resource IDs (Genie Space, SQL Warehouse, App SP) change on redeploy/recreate. They are stored only in `databricks.yml` variables and `app.yaml` — never in source code or documentation.
 
 ---
 
@@ -525,12 +606,34 @@ Promotion flow: train → eval passes thresholds → register → set alias `cha
 
 | Service | File | Purpose |
 | --- | --- | --- |
-| `live_router_service.py` | Router (live) | Calls Model Serving, dispatches to certified/analytical lane |
+| `live_router_service.py` | Router (live) | Calls Model Serving, dispatches to certified/analytical lane, builds routing reason |
 | `demo_router_service.py` | Router (demo) | Offline demo mode — no serving endpoint needed |
-| `certified_lane_service.py` | Certified lane | Lookup SQL, extract params via LLM, execute, format |
-| `genie_service.py` | Analytical lane | Genie Space Conversation API (start, poll, extract) |
+| `certified_lane_service.py` | Certified lane | Lookup SQL, extract params (LLM), validate params (DB), execute, format |
+| `genie_service.py` | Analytical lane | Genie Space Conversation API (start, poll, extract, SQL auto-correct) |
 | `corpus_service.py` | Corpus CRUD | Submit drafts, certify, reject, list pending reviews |
 | `history_service.py` | Query logging | Log queries to Delta table, read stats |
+
+### UI Design Decisions
+
+**Routing Reason (replaces Confidence display):**
+
+The binary judge always produces 0% or 100% confidence — this is not meaningful to display. Instead, the UI shows a human-readable **Routing Reason** explaining WHY the query was routed:
+
+| Lane | Routing Reason Example |
+| --- | --- |
+| Certified | "Intent matches certified question (QA-0005): "Which regions have the highest CPM?"" |
+| Analytical (high VS) | "Closest match: "ROI for {campaign}" (97.7%), but LLM Judge determined the intent differs — answered by Genie." |
+| Analytical (low VS) | "No relevant match found in the certified corpus — answered by Genie." |
+
+**Markdown Table Rendering:**
+
+Answer templates that reference `{results_table}` generate markdown tables. The UI detects markdown table patterns (lines starting/ending with `|` + separator row with `---`) and renders them as styled HTML tables with:
+- Navy header matching Banner Health design system
+- Alternating row backgrounds (zebra striping)
+- Hover highlight effect
+- Rounded corners with subtle shadow
+
+Detection is gated by regex (`/^\|.+\|$/m` + `/^\|\s*-{3,}\s*\|/m`) to prevent false positives on casual text containing pipes or dashes.
 
 ### API_MODE Selection
 
@@ -548,15 +651,16 @@ Promotion flow: train → eval passes thresholds → register → set alias `cha
 ```sql
 CREATE TABLE certified_qa_corpus (
     id                  STRING NOT NULL,
-    question            STRING NOT NULL,
-    question_embedding  ARRAY<FLOAT>,
-    parameterized_sql   STRING NOT NULL,
-    answer_template     STRING NOT NULL,
-    parameters          ARRAY<STRING>,
-    status              STRING,          -- certified | draft | expired
+    question            STRING NOT NULL,   -- Display + Judge (keeps {param} placeholders)
+    embedding_text      STRING NOT NULL,   -- VS embedding (params stripped for intent matching)
+    question_embedding  ARRAY<FLOAT>,      -- Auto-computed embedding vector
+    parameterized_sql   STRING,            -- Pre-approved SQL template with :param placeholders
+    answer_template     STRING,            -- Jinja-style answer template ({results_table}, {metric:.2f})
+    parameters          STRING,            -- JSON array of parameter names
+    status              STRING,            -- certified | draft | expired
     certified_by        STRING,
     certified_date      TIMESTAMP,
-    next_review_date    DATE NOT NULL,
+    next_review_date    DATE,              -- Entries past this date are "stale" (rejected by gate)
     created_at          TIMESTAMP,
     updated_at          TIMESTAMP
 ) TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true')
@@ -597,19 +701,21 @@ CREATE TABLE query_history (
 
 ---
 
-## 12. Key Resource IDs
+## 12. Key Resources
 
-| Resource | ID / Name |
-| --- | --- |
-| SQL Warehouse | `2d8e531640ffa469` |
-| VS Endpoint | `bannerwise-vs-endpoint` |
-| VS Index | `aw_serverless_stable_catalog.bannerhealth.certified_qa_index` |
-| Serving Endpoint | `bannerwise-quality-router` |
-| Registered Model | `aw_serverless_stable_catalog.bannerhealth.bannerwise_quality_router` |
-| Genie Space | `01f19026d0e61c88b840ce168a9be672` |
-| App (dev) | `dev-bw-quality-agent` |
-| App SP | `26659230-2dcc-4c45-acdf-f907aeba6eec` |
-| LLM Endpoint | `databricks-meta-llama-3-3-70b-instruct` |
+Resource IDs are dynamic (change on redeploy/recreate). They are managed exclusively via DABs variables and `app.yaml` — refer to those files for current values.
+
+| Resource | Configured In | Notes |
+| --- | --- | --- |
+| SQL Warehouse | `databricks.yml` → `sql_warehouse_id` | Used for certified lane SQL execution and Genie |
+| VS Endpoint | `resources/bannerwise_quality_agent.ai.yml` | Provisioned by DABs, referenced by name |
+| VS Index | Derived from `catalog.schema.certified_qa_index` | Created by `vector_index_job` |
+| Serving Endpoint | `databricks.yml` → `serving_endpoint_name` | Hosts the MLflow PyFunc router model |
+| Registered Model | `databricks.yml` → `catalog.schema.model_name` | UC registered model with "champion" alias |
+| Genie Space | `app.yaml` → `GENIE_SPACE_ID` | Created by DABs genie resource, ID updates on recreate |
+| App (dev) | `resources/bannerwise_quality_agent.app.yml` | Name prefixed with target (e.g., `dev-`) |
+| App SP | Auto-provisioned by Databricks Apps | Referenced via `${resources.apps.*.service_principal_id}` |
+| LLM Endpoint | `databricks.yml` → `judge_model` / `app.yaml` → `LLM_ENDPOINT` | Foundation model endpoint |
 
 ---
 
